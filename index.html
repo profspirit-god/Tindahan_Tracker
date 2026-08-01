@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Tindahan Tracker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&display=swap');
+
+  :root{
+    --cover:#16423C;
+    --cover-dark:#0E2E29;
+    --page:#FFFBF1;
+    --page-line:#E4D9BE;
+    --ink:#2A2521;
+    --ink-soft:#6B6255;
+    --brass:#A9762F;
+    --brass-light:#D9A55C;
+    --teal:#2C6E7F;
+    --teal-dark:#1F4F5C;
+    --good:#2E6B4F;
+    --good-bg:#E4EFE7;
+    --bad:#8C3A32;
+    --bad-bg:#F4E4E1;
+    --radius:16px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--cover);
+    font-family:'Public Sans', system-ui, sans-serif;
+    color:var(--ink);
+    min-height:100vh;
+    font-size:17px;
+  }
+  #app{
+    max-width:520px;
+    margin:0 auto;
+    min-height:100vh;
+    background:var(--page);
+    background-image: repeating-linear-gradient(var(--page) 0 41px, var(--page-line) 41px 42px);
+    background-attachment:local;
+    position:relative;
+    padding-bottom:40px;
+  }
+  #app::before{
+    content:"";
+    position:absolute; top:0; bottom:0; left:38px;
+    width:2px; background:var(--bad); opacity:.35;
+  }
+  header.top{
+    background:var(--cover);
+    background-image: linear-gradient(180deg, var(--cover), var(--cover-dark));
+    color:var(--page);
+    padding:22px 20px 18px;
+    position:sticky; top:0; z-index:5;
+    box-shadow:0 3px 10px rgba(0,0,0,.25);
+  }
+  header.top h1{
+    font-family:'Zilla Slab', serif;
+    font-size:26px; margin:0; letter-spacing:.3px;
+  }
+  header.top p{margin:4px 0 0; font-size:13px; color:var(--brass-light); font-weight:500;}
+  .backbar{
+    display:flex; align-items:center; gap:10px;
+  }
+  .backbtn{
+    background:rgba(255,255,255,.12); border:none; color:var(--page);
+    width:38px; height:38px; border-radius:10px; font-size:20px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .backbtn:active{background:rgba(255,255,255,.25);}
+  main{padding:18px 20px 10px; position:relative;}
+  .grid-home{
+    display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:6px;
+  }
+  .tile{
+    background:var(--page); border:2px solid var(--brass); border-radius:var(--radius);
+    padding:18px 12px; text-align:center; cursor:pointer; min-height:108px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    transition:transform .12s ease;
+  }
+  .tile:active{transform:scale(.96); background:#FCF3DF;}
+  .tile .ic{font-size:30px;}
+  .tile .en{font-family:'Zilla Slab', serif; font-weight:600; font-size:16px; line-height:1.2;}
+  .tile .fil{font-size:12.5px; color:var(--ink-soft);}
+  .section-title{
+    font-family:'Zilla Slab', serif; font-size:21px; font-weight:600; margin:2px 0 4px;
+    color:var(--cover-dark);
+  }
+  .subtitle{font-size:13.5px; color:var(--ink-soft); margin:0 0 14px;}
+  .card{
+    background:#fff; border:1px solid var(--page-line); border-radius:var(--radius);
+    padding:16px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,.05);
+  }
+  label{display:block; font-size:13px; font-weight:600; color:var(--ink-soft); margin:10px 0 4px;}
+  label:first-child{margin-top:0;}
+  input[type=text], input[type=number], input[type=date], select, textarea{
+    width:100%; padding:12px 12px; font-size:16px; border:1.5px solid var(--page-line);
+    border-radius:10px; font-family:inherit; background:#FEFDFA; color:var(--ink);
+  }
+  input:focus, select:focus, textarea:focus{outline:2px solid var(--teal); border-color:var(--teal);}
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    padding:13px 18px; border-radius:12px; border:none; font-size:15.5px; font-weight:700;
+    cursor:pointer; font-family:inherit;
+  }
+  .btn-primary{background:var(--teal); color:#fff; width:100%; margin-top:14px;}
+  .btn-primary:active{background:var(--teal-dark);}
+  .btn-ghost{background:transparent; color:var(--bad); border:1.5px solid var(--bad); padding:8px 14px; font-size:13.5px;}
+  .entry{
+    display:flex; justify-content:space-between; align-items:flex-start; gap:10px;
+    padding:12px 0; border-bottom:1px dashed var(--page-line);
+  }
+  .entry:last-child{border-bottom:none;}
+  .entry .meta{font-size:12.5px; color:var(--ink-soft); margin-top:2px;}
+  .entry .amt{font-weight:700; white-space:nowrap;}
+  .amt.pos{color:var(--good);}
+  .amt.neg{color:var(--bad);}
+  .pill{
+    display:inline-block; font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:20px;
+    margin-left:6px;
+  }
+  .pill.paid{background:var(--good-bg); color:var(--good);}
+  .pill.unpaid{background:var(--bad-bg); color:var(--bad);}
+  .pill.overdue{background:var(--bad); color:#fff;}
+  .del{background:none; border:none; color:var(--ink-soft); font-size:18px; cursor:pointer; padding:2px 6px;}
+  .stamp{
+    border:3px solid; border-radius:14px; padding:14px 10px; text-align:center;
+    font-family:'Zilla Slab', serif; font-weight:700; font-size:18px; letter-spacing:1px;
+    transform:rotate(-2deg); margin:16px 0;
+  }
+  .stamp.good{border-color:var(--good); color:var(--good); background:var(--good-bg);}
+  .stamp.bad{border-color:var(--bad); color:var(--bad); background:var(--bad-bg);}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .sumline{display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px dashed var(--page-line); font-size:15px;}
+  .sumline:last-child{border:none;}
+  .sumline b{font-weight:700;}
+  .tip{
+    background:#FCF3DF; border-left:4px solid var(--brass); padding:12px 14px; border-radius:8px;
+    margin-bottom:10px; font-size:14.5px; line-height:1.5;
+  }
+  .help-h{font-family:'Zilla Slab', serif; font-weight:600; font-size:16.5px; color:var(--teal-dark); margin:18px 0 6px;}
+  .help-p{font-size:14.5px; line-height:1.6; margin:0 0 8px; color:var(--ink);}
+  .empty{text-align:center; color:var(--ink-soft); font-size:14px; padding:20px 0;}
+  select{appearance:auto;}
+  .field-inline{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0;}
+  .field-inline input{width:110px; text-align:right;}
+  .banner{
+    font-size:12.5px; background:#FCF3DF; border:1px solid var(--brass-light); color:var(--ink-soft);
+    padding:8px 12px; border-radius:10px; margin-bottom:14px;
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+const STORAGE_KEY = "family-store-data";
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+const DEFAULT_HOUSEHOLD = [
+  {cat:"Boarding house rental", fil:"Upa sa bahay", budget:4500, actual:0},
+  {cat:"Household food", fil:"Pagkain", budget:1000, actual:0},
+  {cat:"Student allowance", fil:"Baon", budget:8000, actual:0},
+  {cat:"Electricity", fil:"Kuryente", budget:5000, actual:0},
+  {cat:"Cooking gas", fil:"Gas panluto", budget:1150, actual:0},
+  {cat:"Tricycle gas", fil:"Gasolina", budget:500, actual:0},
+  {cat:"Wifi", fil:"Wifi", budget:1206, actual:0},
+];
+
+let state = {
+  dailyLogs: [],
+  gcashLogs: [],
+  payables: [],
+  household: DEFAULT_HOUSEHOLD.map(h=>({...h})),
+  inventory: []
+};
+let view = "home";
+let loaded = false;
+
+function peso(n){
+  n = Number(n)||0;
+  const neg = n < 0;
+  const s = Math.abs(n).toLocaleString('en-PH',{maximumFractionDigits:0});
+  return (neg?"-":"") + "₱" + s;
+}
+function todayStr(){
+  return new Date().toISOString().slice(0,10);
+}
+function monthKey(dateStr){
+  return (dateStr||"").slice(0,7);
+}
+function el(html){
+  const d = document.createElement('div');
+  d.innerHTML = html.trim();
+  return d.firstElementChild;
+}
+
+async function loadState(){
+  try{
+    const res = await window.storage.get(STORAGE_KEY, true);
+    if(res && res.value){
+      const parsed = JSON.parse(res.value);
+      state = Object.assign(state, parsed);
+      if(!state.household || state.household.length===0){
+        state.household = DEFAULT_HOUSEHOLD.map(h=>({...h}));
+      }
+    }
+  }catch(e){
+    console.log("No existing data yet, starting fresh.", e);
+  }
+  loaded = true;
+}
+async function saveState(){
+  try{
+    await window.storage.set(STORAGE_KEY, JSON.stringify(state), true);
+  }catch(e){
+    console.error("Save failed", e);
+  }
+}
+
+function go(v){ view = v; render(); window.scrollTo(0,0); }
+
+function header(title, filTitle, showBack){
+  return `
+  <header class="top">
+    <div class="backbar">
+      ${showBack ? `<button class="backbtn" onclick="go('home')">‹</button>` : ''}
+      <div>
+        <h1>${title}</h1>
+        ${filTitle ? `<p>${filTitle}</p>` : ''}
+      </div>
+    </div>
+  </header>`;
+}
+
+function render(){
+  const app = document.getElementById('app');
+  if(!loaded){
+    app.innerHTML = `<div style="padding:40px;text-align:center;color:#6B6255;">Loading…</div>`;
+    return;
+  }
+  let html = "";
+  if(view==="home") html = renderHome();
+  else if(view==="daily") html = renderDaily();
+  else if(view==="gcash") html = renderGcash();
+  else if(view==="payables") html = renderPayables();
+  else if(view==="household") html = renderHousehold();
+  else if(view==="inventory") html = renderInventory();
+  else if(view==="summary") html = renderSummary();
+  else if(view==="help") html = renderHelp();
+  app.innerHTML = html;
+  attachHandlers();
+}
+
+/* ---------------- HOME ---------------- */
+function renderHome(){
+  return `
+  ${header("Tindahan Tracker","Ang tatlong supot ng pera")}
+  <main>
+    <p class="subtitle">Tap a button below. Every family member sees the same records.</p>
+    <div class="grid-home">
+      <div class="tile" onclick="go('daily')"><div class="ic">🗓️</div><div class="en">Today's Entry</div><div class="fil">Ngayong Araw</div></div>
+      <div class="tile" onclick="go('gcash')"><div class="ic">📲</div><div class="en">GCash</div><div class="fil">Padala't Cash-in</div></div>
+      <div class="tile" onclick="go('payables')"><div class="ic">📒</div><div class="en">Utang / Loans</div><div class="fil">Utang sa Supplier</div></div>
+      <div class="tile" onclick="go('household')"><div class="ic">🏠</div><div class="en">Household Budget</div><div class="fil">Gastos sa Bahay</div></div>
+      <div class="tile" onclick="go('inventory')"><div class="ic">📦</div><div class="en">Top Items</div><div class="fil">Mga Bentang Paninda</div></div>
+      <div class="tile" onclick="go('summary')"><div class="ic">📊</div><div class="en">Monthly Summary</div><div class="fil">Buod ng Buwan</div></div>
+    </div>
+    <div class="tile" style="margin-top:14px; grid-column:1/-1;" onclick="go('help')">
+      <div class="ic">💡</div><div class="en">Help &amp; Tips</div><div class="fil">Gabay at mga Tip</div>
+    </div>
+  </main>`;
+}
+
+/* ---------------- DAILY LOG ---------------- */
+function renderDaily(){
+  const rows = [...state.dailyLogs].sort((a,b)=>b.date.localeCompare(a.date));
+  return `
+  ${header("Today's Entry","Ilagay ang benta at pambili ngayong araw", true)}
+  <main>
+    <div class="card">
+      <label>Date / Petsa</label>
+      <input type="date" id="d-date" value="${todayStr()}">
+      <label>Sales Cash In (₱) — Benta</label>
+      <input type="number" id="d-sales" placeholder="0" inputmode="decimal">
+      <label>Stock Purchases Out (₱) — Pambili ng Paninda</label>
+      <input type="number" id="d-purch" placeholder="0" inputmode="decimal">
+      <label>GCash Fee Earned (₱) — Kita sa GCash</label>
+      <input type="number" id="d-fee" placeholder="0" inputmode="decimal">
+      <label>Moved to Household (₱) — Kinuha para sa Bahay</label>
+      <input type="number" id="d-draw" placeholder="0" inputmode="decimal">
+      <label>Notes / Paalala</label>
+      <input type="text" id="d-notes" placeholder="Optional">
+      <button class="btn btn-primary" onclick="addDaily()">Save Entry</button>
+    </div>
+    <div class="section-title">Recent Entries</div>
+    <div class="card">
+      ${rows.length===0 ? `<div class="empty">Wala pang entry. Add your first one above.</div>` : rows.slice(0,30).map((r,i)=>{
+        const balanceNote = r.notes ? `· ${escapeHtml(r.notes)}` : '';
+        const net = (r.salesIn||0) + (r.fee||0) - (r.purchOut||0) - (r.movedDraw||0);
+        return `<div class="entry">
+          <div>
+            <div><b>${r.date}</b>${balanceNote}</div>
+            <div class="meta">Sales ${peso(r.salesIn)} · Bought ${peso(r.purchOut)} · GCash ${peso(r.fee)} · To home ${peso(r.movedDraw)}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="amt ${net>=0?'pos':'neg'}">${peso(net)}</div>
+            <button class="del" onclick="delItem('dailyLogs', ${state.dailyLogs.indexOf(r)})">✕</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </main>`;
+}
+function addDaily(){
+  const date = document.getElementById('d-date').value || todayStr();
+  const entry = {
+    date,
+    salesIn: parseFloat(document.getElementById('d-sales').value)||0,
+    purchOut: parseFloat(document.getElementById('d-purch').value)||0,
+    fee: parseFloat(document.getElementById('d-fee').value)||0,
+    movedDraw: parseFloat(document.getElementById('d-draw').value)||0,
+    notes: document.getElementById('d-notes').value.trim()
+  };
+  state.dailyLogs.push(entry);
+  saveState();
+  render();
+}
+
+/* ---------------- GCASH ---------------- */
+function renderGcash(){
+  const rows = [...state.gcashLogs].sort((a,b)=>b.date.localeCompare(a.date));
+  return `
+  ${header("GCash Float","Panghawak na pera para sa cash-in/cash-out", true)}
+  <main>
+    <div class="card">
+      <label>Date / Petsa</label>
+      <input type="date" id="g-date" value="${todayStr()}">
+      <label>Float Start (₱) — Panimulang Pera</label>
+      <input type="number" id="g-start" placeholder="0" inputmode="decimal">
+      <label>Cash-In Volume (₱) — Pinasok na Padala</label>
+      <input type="number" id="g-in" placeholder="0" inputmode="decimal">
+      <label>Cash-Out Volume (₱) — Kinuhang Padala</label>
+      <input type="number" id="g-out" placeholder="0" inputmode="decimal">
+      <label>Fee Earned (₱) — Kita sa Bayad</label>
+      <input type="number" id="g-fee" placeholder="0" inputmode="decimal">
+      <button class="btn btn-primary" onclick="addGcash()">Save Entry</button>
+    </div>
+    <div class="section-title">Recent Entries</div>
+    <div class="card">
+      ${rows.length===0 ? `<div class="empty">Wala pang entry.</div>` : rows.slice(0,30).map(r=>{
+        const end = (r.start||0) + (r.cashIn||0) - (r.cashOut||0) + (r.fee||0);
+        return `<div class="entry">
+          <div>
+            <div><b>${r.date}</b></div>
+            <div class="meta">Start ${peso(r.start)} · In ${peso(r.cashIn)} · Out ${peso(r.cashOut)} · Fee ${peso(r.fee)}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="amt pos">${peso(end)}</div>
+            <button class="del" onclick="delItem('gcashLogs', ${state.gcashLogs.indexOf(r)})">✕</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </main>`;
+}
+function addGcash(){
+  const date = document.getElementById('g-date').value || todayStr();
+  state.gcashLogs.push({
+    date,
+    start: parseFloat(document.getElementById('g-start').value)||0,
+    cashIn: parseFloat(document.getElementById('g-in').value)||0,
+    cashOut: parseFloat(document.getElementById('g-out').value)||0,
+    fee: parseFloat(document.getElementById('g-fee').value)||0
+  });
+  saveState();
+  render();
+}
+
+/* ---------------- PAYABLES ---------------- */
+function renderPayables(){
+  const rows = [...state.payables].sort((a,b)=>(a.due||"").localeCompare(b.due||""));
+  const today = todayStr();
+  return `
+  ${header("Utang / Loans","Utang sa Supplier at Pautang", true)}
+  <main>
+    <div class="card">
+      <label>Supplier / Lender — Pinagkunan</label>
+      <input type="text" id="p-name" placeholder="e.g. Ate Nena, Panel supplier">
+      <label>Item or Reason — Dahilan</label>
+      <input type="text" id="p-item" placeholder="e.g. Sardinas restock">
+      <label>Amount Owed (₱) — Halaga ng Utang</label>
+      <input type="number" id="p-amt" placeholder="0" inputmode="decimal">
+      <div class="row2">
+        <div><label>Date Received</label><input type="date" id="p-received" value="${today}"></div>
+        <div><label>Due Date</label><input type="date" id="p-due"></div>
+      </div>
+      <button class="btn btn-primary" onclick="addPayable()">Save Entry</button>
+    </div>
+    <div class="section-title">All Utang / Loans</div>
+    <div class="card">
+      ${rows.length===0 ? `<div class="empty">Wala pang utang na naka-record.</div>` : rows.map(r=>{
+        const idx = state.payables.indexOf(r);
+        const overdue = r.status!=="Paid" && r.due && r.due < today;
+        const pillClass = r.status==="Paid" ? "paid" : (overdue?"overdue":"unpaid");
+        const pillText = r.status==="Paid" ? "Paid" : (overdue?"OVERDUE":"Unpaid");
+        return `<div class="entry">
+          <div>
+            <div><b>${escapeHtml(r.name)}</b> <span class="pill ${pillClass}">${pillText}</span></div>
+            <div class="meta">${escapeHtml(r.item||'')} · Due ${r.due||'—'}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="amt neg">${peso(r.amt)}</div>
+            <div style="margin-top:4px; display:flex; gap:6px; justify-content:flex-end;">
+              ${r.status!=="Paid" ? `<button class="btn btn-ghost" style="border-color:var(--good); color:var(--good); padding:5px 10px; font-size:12px;" onclick="markPaid(${idx})">Mark Paid</button>` : ''}
+              <button class="del" onclick="delItem('payables', ${idx})">✕</button>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </main>`;
+}
+function addPayable(){
+  const name = document.getElementById('p-name').value.trim();
+  if(!name) return;
+  state.payables.push({
+    name,
+    item: document.getElementById('p-item').value.trim(),
+    amt: parseFloat(document.getElementById('p-amt').value)||0,
+    received: document.getElementById('p-received').value,
+    due: document.getElementById('p-due').value,
+    status: "Unpaid"
+  });
+  saveState();
+  render();
+}
+function markPaid(idx){
+  state.payables[idx].status = "Paid";
+  saveState();
+  render();
+}
+
+/* ---------------- HOUSEHOLD ---------------- */
+function renderHousehold(){
+  const total = state.household.reduce((s,h)=>s+(Number(h.budget)||0),0);
+  const totalActual = state.household.reduce((s,h)=>s+(Number(h.actual)||0),0);
+  return `
+  ${header("Household Budget","Gastos ng Pamilya buwan-buwan", true)}
+  <main>
+    <p class="subtitle">Set one fixed monthly amount per category instead of taking money out as needed.</p>
+    <div class="card">
+      ${state.household.map((h,i)=>`
+        <div style="padding:10px 0; border-bottom:1px dashed var(--page-line);">
+          <div style="font-weight:600;">${escapeHtml(h.cat)} <span style="font-weight:400; color:var(--ink-soft); font-size:12.5px;">(${escapeHtml(h.fil)})</span></div>
+          <div class="row2" style="margin-top:6px;">
+            <div><label style="margin:0 0 3px;">Budget</label><input type="number" value="${h.budget}" onchange="updHousehold(${i},'budget',this.value)"></div>
+            <div><label style="margin:0 0 3px;">Actual</label><input type="number" value="${h.actual}" onchange="updHousehold(${i},'actual',this.value)"></div>
+          </div>
+        </div>`).join('')}
+      <div style="display:flex; gap:8px; margin-top:12px;">
+        <input type="text" id="h-new-cat" placeholder="Add another category…">
+        <button class="btn" style="background:var(--brass); color:#fff;" onclick="addHouseholdCat()">+</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="sumline"><span>Total Budget</span><b>${peso(total)}</b></div>
+      <div class="sumline"><span>Total Actual</span><b>${peso(totalActual)}</b></div>
+    </div>
+  </main>`;
+}
+function updHousehold(i,field,val){
+  state.household[i][field] = parseFloat(val)||0;
+  saveState();
+  render();
+}
+function addHouseholdCat(){
+  const v = document.getElementById('h-new-cat').value.trim();
+  if(!v) return;
+  state.household.push({cat:v, fil:"", budget:0, actual:0});
+  saveState();
+  render();
+}
+
+/* ---------------- INVENTORY ---------------- */
+function renderInventory(){
+  const rows = state.inventory;
+  return `
+  ${header("Top Items","Mga bentang paninda na kailangang bantayan", true)}
+  <main>
+    <p class="subtitle">Track only your ~20–30 fastest-moving or highest-value items — not everything in the store.</p>
+    <div class="card">
+      <label>Item Name</label>
+      <input type="text" id="i-name" placeholder="e.g. Bottled water 500ml">
+      <div class="row2">
+        <div><label>Cost / Unit (₱)</label><input type="number" id="i-cost" placeholder="0"></div>
+        <div><label>Sell Price (₱)</label><input type="number" id="i-price" placeholder="0"></div>
+      </div>
+      <div class="row2">
+        <div><label>Current Stock</label><input type="number" id="i-stock" placeholder="0"></div>
+        <div><label>Reorder Point</label><input type="number" id="i-reorder" placeholder="0"></div>
+      </div>
+      <button class="btn btn-primary" onclick="addInventory()">Save Item</button>
+    </div>
+    <div class="section-title">Item List</div>
+    <div class="card">
+      ${rows.length===0 ? `<div class="empty">Wala pang item na naka-list.</div>` : rows.map((r,i)=>{
+        const low = Number(r.stock) <= Number(r.reorder);
+        const margin = (Number(r.price)||0) - (Number(r.cost)||0);
+        return `<div class="entry">
+          <div>
+            <div><b>${escapeHtml(r.name)}</b> ${low?`<span class="pill overdue">LOW STOCK</span>`:''}</div>
+            <div class="meta">Stock ${r.stock} (reorder at ${r.reorder}) · Margin ${peso(margin)}/unit</div>
+          </div>
+          <div style="text-align:right;">
+            <button class="del" onclick="delItem('inventory', ${i})">✕</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </main>`;
+}
+function addInventory(){
+  const name = document.getElementById('i-name').value.trim();
+  if(!name) return;
+  state.inventory.push({
+    name,
+    cost: parseFloat(document.getElementById('i-cost').value)||0,
+    price: parseFloat(document.getElementById('i-price').value)||0,
+    stock: parseFloat(document.getElementById('i-stock').value)||0,
+    reorder: parseFloat(document.getElementById('i-reorder').value)||0
+  });
+  saveState();
+  render();
+}
+
+/* ---------------- SUMMARY ---------------- */
+function renderSummary(){
+  const now = new Date();
+  const defaultMonth = now.toISOString().slice(0,7);
+  const sel = window._selMonth || defaultMonth;
+  const dRows = state.dailyLogs.filter(r=>monthKey(r.date)===sel);
+  const salesIn = dRows.reduce((s,r)=>s+(r.salesIn||0),0);
+  const purchOut = dRows.reduce((s,r)=>s+(r.purchOut||0),0);
+  const feeIn = dRows.reduce((s,r)=>s+(r.fee||0),0);
+  const movedOut = dRows.reduce((s,r)=>s+(r.movedDraw||0),0);
+  const opResult = salesIn + feeIn - purchOut;
+  const householdTotal = state.household.reduce((s,h)=>s+(Number(h.budget)||0),0);
+  const net = opResult - householdTotal;
+  const unpaidTotal = state.payables.filter(p=>p.status!=="Paid").reduce((s,p)=>s+(p.amt||0),0);
+
+  const monthOptions = buildMonthOptions(sel);
+
+  return `
+  ${header("Monthly Summary","Buod ng Buwan", true)}
+  <main>
+    <label>Select Month</label>
+    <select id="sum-month" onchange="changeMonth(this.value)">${monthOptions}</select>
+    <div class="card" style="margin-top:14px;">
+      <div class="sumline"><span>Sales In</span><b class="amt pos">${peso(salesIn)}</b></div>
+      <div class="sumline"><span>Stock Purchases Out</span><b class="amt neg">${peso(purchOut)}</b></div>
+      <div class="sumline"><span>GCash Fees Earned</span><b class="amt pos">${peso(feeIn)}</b></div>
+      <div class="sumline"><span>Store Operating Result</span><b>${peso(opResult)}</b></div>
+      <div class="sumline"><span>Household Budget (monthly)</span><b class="amt neg">${peso(householdTotal)}</b></div>
+      <div class="sumline"><span>Net After Household Draw</span><b class="${net>=0?'amt pos':'amt neg'}">${peso(net)}</b></div>
+    </div>
+    <div class="stamp ${net>=0?'good':'bad'}">${net>=0 ? "PROFITABLE THIS MONTH" : "NEEDS ATTENTION"}</div>
+    <div class="card">
+      <div class="sumline"><span>Unpaid Loans / Utang</span><b class="amt neg">${peso(unpaidTotal)}</b></div>
+    </div>
+    <p class="subtitle">Positive = the store covers the family's living costs and still has extra. Negative = current household spending is more than the store earns — worth revisiting together.</p>
+  </main>`;
+}
+function buildMonthOptions(sel){
+  const set = new Set(state.dailyLogs.map(r=>monthKey(r.date)).filter(Boolean));
+  set.add(sel);
+  const arr = Array.from(set).sort().reverse();
+  return arr.map(m=>{
+    const [y,mo] = m.split('-');
+    const label = `${MONTHS[parseInt(mo,10)-1]} ${y}`;
+    return `<option value="${m}" ${m===sel?'selected':''}>${label}</option>`;
+  }).join('');
+}
+function changeMonth(v){
+  window._selMonth = v;
+  render();
+}
+
+/* ---------------- HELP ---------------- */
+function renderHelp(){
+  const tips = [
+    "Fill in the Daily Entry every night before closing — it only takes 5 minutes and it's the single habit that fixes everything else.",
+    "Never spend GCash float money on store stock, and never spend store sales money to top up GCash float. Keep them separate in your head and in the app.",
+    "Move money to 'Household' once, on a set schedule (e.g. every payday), instead of taking small amounts whenever needed.",
+    "When a supplier panel arrives unannounced, check the Utang tab first — if this month's due payments are tight, it's okay to say 'next visit' for a non-essential restock.",
+    "Review the Monthly Summary together as a family once a month — it's meant to start a conversation, not to blame anyone."
+  ];
+  return `
+  ${header("Help & Tips","Gabay sa Paggamit", true)}
+  <main>
+    <div class="banner">This app is shared — anyone in the family who opens it sees the same records. There's no password, so only share it with family.</div>
+
+    <div class="help-h">Ang Tatlong Supot ng Pera (The 3 Pots)</div>
+    <p class="help-p"><b>1. Store Cash</b> — pera para sa pagtitinda at pambili ng paninda. Ito lang ang ginagalaw sa "Today's Entry".</p>
+    <p class="help-p"><b>2. GCash Float</b> — hiwalay na pera para lang sa cash-in/cash-out. Huwag haluin sa pera ng tindahan.</p>
+    <p class="help-p"><b>3. Household / Bahay</b> — piniling halaga bawat buwan para sa gastos ng pamilya, kinukuha lang isang beses, hindi paisa-isa.</p>
+
+    <div class="help-h">Paano Gamitin</div>
+    <p class="help-p"><b>Today's Entry</b> — ilagay ang benta, pambili, at kita sa GCash tuwing gabi bago magsara.</p>
+    <p class="help-p"><b>Utang / Loans</b> — bawat may utang na supplier o pautang, ilista dito para may paalala ang due date.</p>
+    <p class="help-p"><b>Household Budget</b> — itakda ang halaga bawat kategorya (upa, pagkain, baon, ilaw). Ito na lang ang kukunin buwan-buwan.</p>
+    <p class="help-p"><b>Top Items</b> — huwag ilista lahat ng paninda — 20-30 pinakamabilis mabenta lang, para hindi mahirapan.</p>
+    <p class="help-p"><b>Monthly Summary</b> — tignan ito minsan sa isang buwan bilang pamilya, para makita kung kumikita talaga ang tindahan.</p>
+
+    <div class="help-h">Tips</div>
+    ${tips.map(t=>`<div class="tip">${t}</div>`).join('')}
+  </main>`;
+}
+
+/* ---------------- utils ---------------- */
+function delItem(key, idx){
+  if(idx<0) return;
+  state[key].splice(idx,1);
+  saveState();
+  render();
+}
+function escapeHtml(s){
+  if(!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function attachHandlers(){ /* all handlers are inline via onclick for simplicity/reliability */ }
+
+/* ---------------- init ---------------- */
+(async function(){
+  render();
+  await loadState();
+  render();
+})();
+</script>
+</body>
+</html>
