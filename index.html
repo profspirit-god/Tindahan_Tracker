@@ -48,6 +48,21 @@
     position:absolute; top:0; bottom:0; left:38px;
     width:2px; background:var(--bad); opacity:.35;
   }
+  #lock-screen{
+    position: fixed; inset:0; background: var(--cover); z-index:999;
+    display: flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
+    color:var(--page); font-family:'publish Sans', sans-serif; padding:20px; text-align:center;
+  }
+  #lock-screen h2{font-family: 'Zilla Slab', serif; margin:0;}
+  #lock-input{
+    font-size:28px; letter-spacing:10px; text-align:center; width:180px;
+    padding:12px; border-radius: 12px; border:none;
+  }
+  #lock-error{color:#F4A9A0; font-size:13px; height:16px;}
+  #lock-btn{
+    background:var(--teal); border:none; padding:12px 30px;
+    border-radius:12px; font-weight:700; font-size:15px; cursor:pointer;
+  }
   header.top{
     background:var(--cover);
     background-image: linear-gradient(180deg, var(--cover), var(--cover-dark));
@@ -153,6 +168,13 @@
 </style>
 </head>
 <body>
+<div id="lock-screen">
+  <h2>🔒 Tindahan Tracker</h2>
+  <p>Enter the family PIN</p>
+  <input type="password" id="lock-input" inputmode="numeric" maxlenght="4" autofocus>
+  <div id="lock-error"></div>
+  <button id="lock-btn" onclick="checkPin()">Unlock</button>
+</div>
 <div id="app"></div>
 
 <script
@@ -166,6 +188,24 @@ const sb = supabase.createClient(
   SUPABASE_URL,
   SUPABASE_KEY
 );
+
+const STORE_PIN = "2808";
+
+function checkPin(){
+  const val = document.getElementById('lock-input').value;
+  if(val === STORE_PIN){
+    localStorage.setItem('storeUnlocked', 'true');
+    document.getElementById('lock-screen').style.display = 'none';
+    startApp();
+  } else {
+    document.getElementById('lock-error').textContent = "Wrong PIN - try again";
+    document.getElementById('lock-input').value = '';
+  }
+}
+document.addEventListener('DOMContentLoaded', ()=>{
+  const input = document.getElementById('lock-input');
+  if(input) input.addEventListener('keydoen', e=>{ if(e.key==='Enter') checkPin(); });
+});
 
 const STORAGE_KEY = "family-store-data";
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -643,12 +683,18 @@ function escapeHtml(s){
 }
 function attachHandlers(){ /* all handlers are inline via onclick for simplicity/reliability */ }
 
+function startApp(){
+  (async function(){
+    render ();
+    await loadState();
+    render();
+  })();
+}
 
-(async function () {
-  render();
-  await loadState();
-  render();
-})();
+if(localStorage.getItem('storeUnlocked') === 'true'){
+  document.getElementById('lock-screen').style.display = 'none';
+  startApp();
+}
 </script>
 </body>
 </html>
