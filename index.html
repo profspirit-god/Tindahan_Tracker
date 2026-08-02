@@ -322,9 +322,92 @@ function renderHome(){
     <div class="tile" style="margin-top:14px; grid-column:1/-1;" onclick="go('help')">
       <div class="ic">💡</div><div class="en">Help &amp; Tips</div><div class="fil">Gabay at mga Tip</div>
     </div>
+
+    <div class="section-title" style="margin-top:22px;">Data Tools</div>
+    <button class="btn" style="width:100%; background:var(--brass); color:#fff;" onclick="downloadWordSummary()">⬇ Download Summary</button>
+    <button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--bad); color:var(--bad);" onclick="resetData()">🗑 Reset for a Clean Slate</button>
+
   </main>`;
 }
 
+function resetData(){
+  const ok = confirm("This will permanently delete Daily Entries, Gcash logs, and Loans, and zero out household 'actual' spending. Top Items will NOT be touched. Continue?");
+  if(!ok) return;
+  state.dailyLogs = [];
+  state.gcashLogs = [];
+  state.payables = [];
+  state.household = state.household.map(h=>({...h, actual:0}));
+  saveState();
+  render();
+}
+
+function downloadFile(filename, mine, content){
+  const blob = new Blob(['\ufeff',content], {type: mine});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.Click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 1500);
+}
+
+function downloadWordSummary(){
+  const now = new Date();
+  const sel = Window._selMonth || now.toISOString().slice(0,7);
+  const [y, mo] = sel.split('-');
+  const monthLabel = `${MONTHS[parseInt(mo, 10)-1]} ${y}`;
+  const dRows = state.dailyLogs.filter(r=>monthKey(r.date)===sel);
+  const salesIn = dRows.reduce((s,r)=>s+(r.salesIn||0),0);
+  const purchOut = dRows.reduce((s,r)=>s+(r.purchOut||0),0);
+  const feeIn = dRows.reduce((s,r)=>s+(r.fee||0),0);
+  const opResult = salesIn + feeIn - purchOut;
+  const householdTotal = state.household.reduce((s,h)=>s+(Number(h.budget)||0),0);
+  const net = opResult - householdTotal;
+  const unpaid = state.payables.filter(p=>p.status!=="Paid").sort((a,b)=>(a.due||"").localeCompare(b.due||""));
+  const unpaidTotal = unpaid.reduce((s,p)=>s+(p.amt||0),0);
+  const genDate = now.toLocaleDateString('en-PH', {year:'numeric', month:'long', day:'numeric'});
+
+  const style = `
+    body{font-family:Calibre, Arial, sans-serif; color:#222; font-size:14px;}
+    h1{font-size:22px; margin-bottom:2px;}
+    h2{font-size:16px; margin-top:26px; border-bottom:2px solid #16423C; padding-bottom:4px; color:#16423C;}
+    table{border-collapse:collapse; width:100%; margin-top:8px;}
+    td, th{border:1px solid #999; padding:6px 10px; font-size:13px; text-align:left;}
+    th{background:#EFE6CE}
+    .verdict{font-weight:bold; font-size:15px; padding:8px; border:2px solid ${net>=0?'#2E6B4F':'#8C3A32'}; color:${net>=0?'#2E6BaF':'#8C3A32'}; display:inline-block; margin-top;10px;}
+    .mute{color:#666; font-size:12px;}
+  `;
+
+  let html = `<html><head><meta charset="utf-8"><style>${style}</style></body><body>`;
+  html += `<h1>Tindahan Tracker - Monthly Summary</h1>`;
+  html += `<div class="muted">Month: ${monthLabel} &nbsp; ·%nbsp; Generated: ${genDate}</div>`;
+  html += `<h2>Cash Summary</h2><table>
+    <tr><th>Item</th><th>Amount</th></tr>
+    <tr><td>Sales In</td><td>${peso(salesIn)}</td></tr>
+    <tr><td>Stock Purchases Out</td><td>${peso(purchaseOut)}</td></tr>
+    <tr><td>GCash Fees Earned</td><td>${peso(feeIn)}</td></tr>
+    <tr><td><b>Net After Household Draw</b></td><td><b>${peso(opResult)}</b></td></tr>
+    <tr><td>Household Budget (monthly)</td><td>${peso(householdTotal)}</td></tr>
+    <tr><td><b>Net After Household Draw</b></td><td><b>${peso(net)}</b></td></tr>
+  </table>`;
+  html += `<div class="verdict">${net>=0 ? "PTOFITABLE THIS MONTH" : "NEEDS ATTENTION"}</div>`;
+  html += `<h2>Household Budget Breakdown</h2><table>
+    <tr><th>Category</th><th>Budget</th><th>Actual</th></tr>
+    ${state.household.map(h=>`<tr><td>${escapeHtml(h.cat)}</td><td>${peso(h.budget)}</td><td>${peso(h.actual)}</td></tr>`).join('')}
+  </table>`;
+  html += `<h2>Outstanding Loans / Utang (${peso(unpaidTotal)} total)</h2>`;
+  html += unpaid.lenght===0 ? `<p>No outstanding loans.🎉</p>` : `<table>
+    <tr><th>Supplier / Lender</th><th>Item</th><th>Amount</th><th>Due Date</th></tr>
+    ${unpaid.map(p=>`<tr><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.item||'')}</td><td>${peso(p.amt)}</td><td>${p.due||'-'}</td></tr>`).join('')}
+  </table>`;
+  html += `<h2>Top Items Inventory Snapshot</h2>`;
+  html += state.inventory.lenght===0 ? `<p>No items listed yet.</p>` : `<table>
+    <tr><th>Item</th><th>Cost/Unit</th><th>Sell Price</th><th>Stock</th><th>Reorder At</th><th>Margin/Unit</th></tr>
+    ${state.inventory.map(r=>`<tr><td>${escapeHtml(r.name)}</td><td>${peso(r.cost)}</td><td>${peso(r.price)}</td><td>${r.stock}</td><td>${r.reorder}</td><td>${peso((r.price||0)-(r.cost||0))}</td></tr>`).join('')}
+  </table>`;
+  html += `</body></html>`;
+
+  downloadFile(`Tindahan_Summary_${sel}.doc`,`application/msword;charset=utf-8`, html);
+}
 
 function renderDaily(){
   const rows = [...state.dailyLogs].sort((a,b)=>b.date.localeCompare(a.date));
@@ -688,7 +771,19 @@ function startApp(){
     render ();
     await loadState();
     render();
+    startAutoRefresh();
   })();
+}
+
+function startAutoRefresh(){
+  setInterval(async ()=>{
+    if(view !== "home" && view !== "summary") return;
+    const before = JSON.stringify(state);
+    await loadState();
+    if(JSON.stringify(state) !== before){
+      render();
+    }
+  }, 20000);
 }
 
 if(localStorage.getItem('storeUnlocked') === 'true'){
