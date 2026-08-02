@@ -345,7 +345,7 @@ function downloadFile(filename, mine, content){
   const blob = new Blob(['\ufeff',content], {type: mine});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.Click();
+  a.click();
   document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(url), 1500);
 }
