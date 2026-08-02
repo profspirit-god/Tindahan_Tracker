@@ -156,9 +156,16 @@
 <div id="app"></div>
 
 <script
-src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js">
-const SUPABASE_URL = "https://nwtdjlfdrqhzbzhxrecz.supabase.co/rest/v1/";
+src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
+<script>
+const SUPABASE_URL = "https://nwtdjlfdrqhzbzhxrecz.supabase.co";
 const SUPABASE_KEY = "sb_publishable_j_U4f9uYgywLJ797IkUeCg_DGDnLhyT";
+
+const sb = supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
 
 const STORAGE_KEY = "family-store-data";
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -202,7 +209,7 @@ function el(html){
 }
 
 async function loadState(){
-  const { data, error} = await supabase
+  const { data, error} = await sb
     .from("app_state")
     .select("data")
     .eq("id", 1)
@@ -218,7 +225,7 @@ async function loadState(){
 }
 
 async function saveState(){
-  await supabase
+  await sb
     .from("app_state")
     .update({ data: state })
     .eq("id", 1);
@@ -258,7 +265,7 @@ function render(){
   attachHandlers();
 }
 
-/* ---------------- HOME ---------------- */
+
 function renderHome(){
   return `
   ${header("Tindahan Tracker","Ang tatlong supot ng pera")}
@@ -278,7 +285,7 @@ function renderHome(){
   </main>`;
 }
 
-/* ---------------- DAILY LOG ---------------- */
+
 function renderDaily(){
   const rows = [...state.dailyLogs].sort((a,b)=>b.date.localeCompare(a.date));
   return `
@@ -333,7 +340,7 @@ function addDaily(){
   render();
 }
 
-/* ---------------- GCASH ---------------- */
+
 function renderGcash(){
   const rows = [...state.gcashLogs].sort((a,b)=>b.date.localeCompare(a.date));
   return `
@@ -383,7 +390,7 @@ function addGcash(){
   render();
 }
 
-/* ---------------- PAYABLES ---------------- */
+
 function renderPayables(){
   const rows = [...state.payables].sort((a,b)=>(a.due||"").localeCompare(b.due||""));
   const today = todayStr();
@@ -447,7 +454,7 @@ function markPaid(idx){
   render();
 }
 
-/* ---------------- HOUSEHOLD ---------------- */
+
 function renderHousehold(){
   const total = state.household.reduce((s,h)=>s+(Number(h.budget)||0),0);
   const totalActual = state.household.reduce((s,h)=>s+(Number(h.actual)||0),0);
@@ -488,7 +495,7 @@ function addHouseholdCat(){
   render();
 }
 
-/* ---------------- INVENTORY ---------------- */
+
 function renderInventory(){
   const rows = state.inventory;
   return `
@@ -540,7 +547,7 @@ function addInventory(){
   render();
 }
 
-/* ---------------- SUMMARY ---------------- */
+
 function renderSummary(){
   const now = new Date();
   const defaultMonth = now.toISOString().slice(0,7);
@@ -592,7 +599,7 @@ function changeMonth(v){
   render();
 }
 
-/* ---------------- HELP ---------------- */
+
 function renderHelp(){
   const tips = [
     "Fill in the Daily Entry every night before closing — it only takes 5 minutes and it's the single habit that fixes everything else.",
@@ -623,7 +630,7 @@ function renderHelp(){
   </main>`;
 }
 
-/* ---------------- utils ---------------- */
+
 function delItem(key, idx){
   if(idx<0) return;
   state[key].splice(idx,1);
@@ -636,7 +643,7 @@ function escapeHtml(s){
 }
 function attachHandlers(){ /* all handlers are inline via onclick for simplicity/reliability */ }
 
-/* ---------------- init ---------------- */
+
 (async function () {
   render();
   await loadState();
