@@ -587,6 +587,8 @@ function addPayable(){
   render();
 }
 function markPaid(idx){
+  const ok = confirm("Sigurado ka ba? Markahan itong bayad na. \n\nAre you sure? This will mark it as paid.");
+  if(!ok) return;
   state.payables[idx].status = "Paid";
   saveState();
   render();
@@ -771,6 +773,8 @@ function renderHelp(){
 
 function delItem(key, idx){
   if(idx<0) return;
+  const ok = confirm("Sigurado ka ba? Tatanggalin ito. \n\nAre you sure? This will delete this entry.");
+  if(!ok) return;
   state[key].splice(idx,1);
   saveState();
   render();
