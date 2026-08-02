@@ -271,7 +271,19 @@ async function saveState(){
     .eq("id", 1);
 }
 
-function go(v){ view = v; render(); window.scrollTo(0,0); }
+function go(v){
+  view = v;
+  render();
+  window.scrollTo(0,0);
+  if(v === "home" || v === "summary"){
+    quickRefresh();
+  }
+}
+
+async function quickRefresh(){
+  await loadState();
+  render();
+}
 
 function header(title, filTitle, showBack){
   return `
