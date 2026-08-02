@@ -341,10 +341,13 @@ function resetData(){
   render();
 }
 
-function downloadFile(filename, mine, content){
-  const blob = new Blob(['\ufeff',content], {type: mine});
+function downloadFile(filename, mime, content){
+  const blob = new Blob(['\ufeff', content], {type: mime});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(url), 1500);
