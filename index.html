@@ -63,6 +63,22 @@
     background:var(--teal); border:none; padding:12px 30px;
     border-radius:12px; font-weight:700; font-size:15px; cursor:pointer;
   }
+  #username-screen{
+    position:fixed; inset:0; background:var(--cover); z-index:998;
+    display:none; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+    color:var(--page); font-family: 'Public Sans', sana-serif; margin:0;}
+  #username-screen h2{font-family: 'Zilla Slab', serif; margin:0;}
+  #username-input{
+    font-size:20px; text-align:center; width:220px;
+    padding:12px; border-radius:12px; border:none;
+  }
+  #username-error{color:#F4A9A0; font-size:13px; min-height:16px;}
+  #username-claim{background:none; border:none; color:var(--brass-light); text-decoration:underline; font-size:12.5px; cursor:pointer;}
+  #user-badge{
+    position:fixed; top:10px; left:10px; z-index:20;
+    background:rgb(0,0,0,.35); color:#fff; font-size:12.5px; font-weight:600;
+    padding:6px 12px; border-radius:20px; cursor:pointer;
+  }
   header.top{
     background:var(--cover);
     background-image: linear-gradient(180deg, var(--cover), var(--cover-dark));
@@ -177,6 +193,16 @@
 </div>
 <div id="app"></div>
 
+<div id="username-screen">
+  <h2>👤 Sino Ka?</h2>
+  <p>Enter your name (e.g. Father, Mother, Tita, your name)</p>
+  <input type="text" id="username-input" placeholder="Your name" maxlenght="20">
+  <div id="username-error"></div>
+  <button id="lock-btn" onclick="submitUsername()">Continue</button>
+  <button id="username-claim" style="display:none;" onclick="claimExistingNmae()">This is me - I'm using a new device</button>
+</div>
+<div id="user-badge" onclick="switchUser()"></div>
+
 <script
 src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
@@ -202,6 +228,67 @@ function checkPin(){
     document.getElementById('lock-input').value = '';
   }
 }
+let currentUser = localStorage.getItem('storeUsername') || null;
+let pendingClaimName = "";
+
+function updateUserBadge(){
+  const badge = document.getElementById('user-badge');
+  if(badge) badge.textContent = currentUser ? `👤 ${currentUser} (tap to switch)` : '';
+}
+
+function ensureUsername(){
+  if(!state.registeredUsers) state.registeredUsers = [];
+  if(currentUser){
+    updateUserBadge();
+    return;
+  }
+  document.getElementById('username-screen').style.display = 'flex';
+}
+
+async function submitUsername(){
+  const val = document.getElementById('username-input').value.trim();
+  const errorE1 = document.getElementById('username-error');
+  const claimBtn = document.getElementById('username-claim');
+  if(!val){
+    errorE1.textContent = "Please enter a name.";
+    return;
+  }
+  const taken = state.registeredUsers.some(u => u.toLowerCase() === val.toLowerCase());
+  if(taken){
+    errorE1.textContent = "⚠ Username used - pick another, or confirm below if it's really you.";
+    claimBtn.style.display = 'inline-block';
+    pendingClaimName = val;
+    return
+  }
+  state.registeredUsers.push(val);
+  await saveState();
+  currentUser = val;
+  localStorage.setItem('storeUsername', val);
+  document.getElementById('username-screen').style.display = 'none';
+  updateUserBadge();
+  render();
+}
+
+function claimExistingName(){
+  currentUser = pendingClaimName;
+  localStorage.setItem('storeUsername', pendingClaimName);
+  document.getElementById('username-screen').style.display = 'none';
+  document.getElementById('username-claim').style.display = 'none';
+  updateUserBadge();
+  render();
+}
+
+function switchUser(){
+  const ok = confirm(`Switch away from "${currentUser}" on this device`);
+  if(!ok) return;
+  localStorage.removeItem('storeUsername');
+  currentUser = null;
+  document.getElementById('username-input').value = '';
+  document.getElementById('username-error').textContent = '';
+  document.getElementById('username-claim').style.display = 'none';
+  document.getElementById('username-screen').style.display = 'flex';
+}
+
 document.addEventListener('DOMContentLoaded', ()=>{
   const input = document.getElementById('lock-input');
   if(input) input.addEventListener('keydoen', e=>{ if(e.key==='Enter') checkPin(); });
@@ -452,7 +539,7 @@ function renderDaily(){
         return `<div class="entry">
           <div>
             <div><b>${r.date}</b>${balanceNote}</div>
-            <div class="meta">Sales ${peso(r.salesIn)} · Bought ${peso(r.purchOut)} · GCash ${peso(r.fee)} · To home ${peso(r.movedDraw)}</div>
+            <div class="meta">Sales ${peso(r.salesIn)} · Bought ${peso(r.purchOut)} · GCash ${peso(r.fee)} · To home ${peso(r.movedDraw)} · by ${r.loggedBy||'-'}</div>
           </div>
           <div style="text-align:right;">
             <div class="amt ${net>=0?'pos':'neg'}">${peso(net)}</div>
@@ -471,7 +558,8 @@ function addDaily(){
     purchOut: parseFloat(document.getElementById('d-purch').value)||0,
     fee: parseFloat(document.getElementById('d-fee').value)||0,
     movedDraw: parseFloat(document.getElementById('d-draw').value)||0,
-    notes: document.getElementById('d-notes').value.trim()
+    notes: document.getElementById('d-notes').value.trim(),
+    loggedBy: currentUser
   };
   state.dailyLogs.push(entry);
   saveState();
@@ -504,7 +592,7 @@ function renderGcash(){
         return `<div class="entry">
           <div>
             <div><b>${r.date}</b></div>
-            <div class="meta">Start ${peso(r.start)} · In ${peso(r.cashIn)} · Out ${peso(r.cashOut)} · Fee ${peso(r.fee)}</div>
+            <div class="meta">Start ${peso(r.start)} · In ${peso(r.cashIn)} · Out ${peso(r.cashOut)} · Fee ${peso(r.fee)} · by ${r.loggedBy||'-'}</div>
           </div>
           <div style="text-align:right;">
             <div class="amt pos">${peso(end)}</div>
@@ -522,7 +610,8 @@ function addGcash(){
     start: parseFloat(document.getElementById('g-start').value)||0,
     cashIn: parseFloat(document.getElementById('g-in').value)||0,
     cashOut: parseFloat(document.getElementById('g-out').value)||0,
-    fee: parseFloat(document.getElementById('g-fee').value)||0
+    fee: parseFloat(document.getElementById('g-fee').value)||0,
+    loggedBy: currentUser
   });
   saveState();
   render();
@@ -558,7 +647,7 @@ function renderPayables(){
         return `<div class="entry">
           <div>
             <div><b>${escapeHtml(r.name)}</b> <span class="pill ${pillClass}">${pillText}</span></div>
-            <div class="meta">${escapeHtml(r.item||'')} · Due ${r.due||'—'}</div>
+            <div class="meta">${escapeHtml(r.item||'')} · Due ${r.due||'—'} · by ${r.loggedBy||'-'}</div>
           </div>
           <div style="text-align:right;">
             <div class="amt neg">${peso(r.amt)}</div>
@@ -581,7 +670,8 @@ function addPayable(){
     amt: parseFloat(document.getElementById('p-amt').value)||0,
     received: document.getElementById('p-received').value,
     due: document.getElementById('p-due').value,
-    status: "Unpaid"
+    status: "Unpaid",
+    loggedBy: currentUser
   });
   saveState();
   render();
@@ -663,7 +753,7 @@ function renderInventory(){
         return `<div class="entry">
           <div>
             <div><b>${escapeHtml(r.name)}</b> ${low?`<span class="pill overdue">LOW STOCK</span>`:''}</div>
-            <div class="meta">Stock ${r.stock} (reorder at ${r.reorder}) · Margin ${peso(margin)}/unit</div>
+            <div class="meta">Stock ${r.stock} (reorder at ${r.reorder}) · Margin ${peso(margin)}/unit · by ${r.loggedBy||'-'}</div>
           </div>
           <div style="text-align:right;">
             <button class="del" onclick="delItem('inventory', ${i})">✕</button>
@@ -681,7 +771,8 @@ function addInventory(){
     cost: parseFloat(document.getElementById('i-cost').value)||0,
     price: parseFloat(document.getElementById('i-price').value)||0,
     stock: parseFloat(document.getElementById('i-stock').value)||0,
-    reorder: parseFloat(document.getElementById('i-reorder').value)||0
+    reorder: parseFloat(document.getElementById('i-reorder').value)||0,
+    loggedBy: currentUser
   });
   saveState();
   render();
@@ -789,6 +880,7 @@ function startApp(){
   (async function(){
     render ();
     await loadState();
+    ensureUsername();
     render();
     startAutoRefresh();
   })();
