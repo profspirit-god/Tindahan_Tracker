@@ -312,7 +312,8 @@ let state = {
   gcashLogs: [],
   payables: [],
   household: DEFAULT_HOUSEHOLD.map(h=>({...h})),
-  inventory: []
+  inventory: [],
+  householdHistory: []
 };
 let view = "home";
 let loaded = false;
@@ -397,6 +398,7 @@ function render(){
   else if(view==="gcash") html = renderGcash();
   else if(view==="payables") html = renderPayables();
   else if(view==="household") html = renderHousehold();
+  else if(view==="householdHistory") html = renderHouseholdHistory();
   else if(view==="inventory") html = renderInventory();
   else if(view==="summary") html = renderSummary();
   else if(view==="help") html = renderHelp();
@@ -706,14 +708,54 @@ function renderHousehold(){
         <button class="btn" style="background:var(--brass); color:#fff;" onclick="addHouseholdCat()">+</button>
       </div>
     </div>
+    <button class='btn' style="width:100%; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="go('householdHistory')">📜 View Entry History</button>
     <div class="card">
       <div class="sumline"><span>Total Budget</span><b>${peso(total)}</b></div>
       <div class="sumline"><span>Total Actual</span><b>${peso(totalActual)}</b></div>
     </div>
   </main>`;
 }
+function renderHouseholdHistory(){
+  const rows = [...(state.householdHistory||[])].reverse();
+  return `
+  ${header("Household History","Kasaysayan ng mga Pagbabago", true)}
+  <main>
+    <button class="btn" style="margin-bottom:14px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="go('household')">‹ Back to Household</button>
+    <div class="card">
+      ${rows.lenght===0 ? `<div class="empty">Wala Pang history.</div>` : rows.slice(0,150).map(r=>{
+      const dt = new Date(r.time);
+      const dtStr = dt.toLocaleString('en-PH', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+      return `<div class="entry">
+        <div>
+          <div><b>${escapeHtml(r.cat)}</b> · ${r.field}</div>
+          <div class="meta">${peso(r.oldVal)} → ${peso(r.newVal)} · by ${escapeHtml(r.by)} · ${dtStr}</div>
+        </div>
+      </div>`;
+    }).join('')}
+    </div>
+  </main>`;
+}
 function updHousehold(i,field,val){
-  state.household[i][field] = parseFloat(val)||0;
+  const oldVal = Number(state.household[i][field]) ||0;
+  const parsed = parseFloat(val);
+  const newVal = isNaN(parsed) ? 0 : parsed;
+
+  if(oldVal > 0 && newVal === 0){
+    const ok = confirm(`Babaguhin ang ${state.household[i].cat} mula &{oldVal} papuntang 0?\n\nChange ${state.household[i].cat} from ${oldVal} to 0?`);
+    if(!ok){ render(); return; }
+  }
+
+  if(!state.householdHistory) state.householdHistory = [];
+  state.householdHistory.push({
+    cat: state.household[i].cat,
+    field: field,
+    oldVal: oldVal,
+    newVal: newVal,
+    by: currentUser || 'Unkown',
+    time: new Date().toISOString()
+  });
+
+  state.household[i][field] = newVal;
   saveState();
   render();
 }
