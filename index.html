@@ -741,7 +741,7 @@ function updHousehold(i,field,val){
   const newVal = isNaN(parsed) ? 0 : parsed;
 
   if(oldVal > 0 && newVal === 0){
-    const ok = confirm(`Babaguhin ang ${state.household[i].cat} mula &{oldVal} papuntang 0?\n\nChange ${state.household[i].cat} from ${oldVal} to 0?`);
+    const ok = confirm(`Babaguhin ang ${state.household[i].cat} mula ${oldVal} papuntang 0?\n\nChange ${state.household[i].cat} from ${oldVal} to 0?`);
     if(!ok){ render(); return; }
   }
 
