@@ -943,6 +943,9 @@ function getHouseholdByCategory(sel){
 }
 let incomeExpenseChart = null;
 let householdPieChart = null;
+let rankMetric = "income";
+let rankOrder = "desc";
+let hhRankOrder = "desc";
 
 function renderInsights(){
   const now = new Date();
@@ -967,14 +970,14 @@ function renderInsights(){
     <div class="section-title">Daily Ranking</div>
     <div class="card">
       <div class="row2">
-        <select id="rank-metric" onchange="render()">
-          <option value="income">Income</option>
-          <option value="expense">Store Expense</option>
-          <option value="net">Net</option>
+        <select onchange="setRankMetric(this.value)">
+          <option value="income" ${rankMetric==="income"?"selected":""}>Income</option>
+          <option value="expense" ${rankMetric==="expense"?"selected":""}>Store Expense</option>
+          <option value="net" ${rankMetric==="net"?"selected":""}>Net</option>
         </select>
-        <select id="rank-order" onchange="render()">
-          <option value="desc">Highest first</option>
-          <option value="asc">Lowest first</option>
+        <select onchange="setRankOrder(this.value)">
+          <option value="desc" ${rankOrder==="desc"?"selected":""}>Highest first</option>
+          <option value="asc" ${rankOrder==="asc"?"selected":""}>Lowest first</option>
         </select>
       </div>
       <div style="margin-top:10px;">${renderDailyRanking(daily)}</div>
@@ -983,9 +986,9 @@ function renderInsights(){
     <div class="section-title">Household Category Ranking</div>
     <div class="card">
       <div class="row2">
-        <select id="hh-rank-order" onchange="render()">
-          <option value="desc">Highest first</option>
-          <option value="asc">Lowest first</option>
+        <select onchange="setHhRankOrder(this.value)">
+          <option value="desc" ${hhRankOrder==="desc"?"selected":""}>Highest first</option>
+          <option value="asc" ${hhRankOrder==="asc"?"selected":""}>Lowest first</option>
         </select>
       </div>
       <div style="margin-top:10px;">${renderHouseholdRanking(household)}</div>
@@ -993,17 +996,24 @@ function renderInsights(){
   </main>`;
 }
 
+function setRankMetric(v){ rankMetric = v; render(); }
+function setRankOrder(v){ rankOrder = v; render(); }
+function setHhRankOrder(v){ hhRankOrder = v; render(); }
+
+function metricColorClass(metric, value){
+  if(metric === 'expense') return 'amt neg';
+  if(metric === 'income') return 'amt pos';
+  return value>=0 ? 'amt pos' : 'amt neg';
+}
+
 function renderDailyRanking(daily){
-  const metric = document.getElementById('rank-metric')?.value || 'income';
-  const order = document.getElementById('rank-order')?.value || 'desc';
-  const sorted = [...daily].sort((a,b)=> order==='desc' ? b[metric]-a[metric] : a[metric]-b[metric]);
+  const sorted = [...daily].sort((a,b)=> rankOrder==='desc' ? b[rankMetric]-a[rankMetric] : a[rankMetric]-b[rankMetric]);
   if(sorted.length===0) return `<div class="empty">Wala pang data ngayong buwan.</div>`;
-  return sorted.map(d=>`<div class="sumline"><span>${d.date}</span><b class="${d[metric]>=0?'amt pos':'amt neg'}">${peso(d[metric])}</b></div>`).join('');
+  return sorted.map(d=>`<div class="sumline"><span>${d.date}</span><b class="${metricColorClass(rankMetric, d[rankMetric])}">${peso(d[rankMetric])}</b></div>`).join('');
 }
 
 function renderHouseholdRanking(household){
-  const order = document.getElementById('hh-rank-order')?.value || 'desc';
-  const sorted = [...household].sort((a,b)=> order==='desc' ? b.total-a.total : a.total-b.total);
+  const sorted = [...household].sort((a,b)=> hhRankOrder==='desc' ? b.total-a.total : a.total-b.total);
   if(sorted.length===0) return `<div class="empty">Wala pang gastos na naka-record ngayong buwan.</div>`;
   return sorted.map(h=>`<div class="sumline"><span>${escapeHtml(h.cat)}</span><b>${peso(h.total)}</b></div>`).join('');
 }
