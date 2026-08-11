@@ -697,10 +697,19 @@ function renderHousehold(){
     <div class="card">
       ${state.household.map((h,i)=>`
         <div style="padding:10px 0; border-bottom:1px dashed var(--page-line);">
-          <div style="font-weight:600;">${escapeHtml(h.cat)} <span style="font-weight:400; color:var(--ink-soft); font-size:12.5px;">(${escapeHtml(h.fil)})</span></div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:600;">${escapeHtml(h.cat)} <span style="font-weight:400; color:var(--ink-soft); font-size:12.5px;">(${escapeHtml(h.fil)})</span></div>
+            <button class="del" onclick="delHouseholdCat(${i})">✕</button>
+          </div>
           <div class="row2" style="margin-top:6px;">
             <div><label style="margin:0 0 3px;">Budget</label><input type="number" value="${h.budget}" onchange="updHousehold(${i},'budget',this.value)"></div>
-            <div><label style="margin:0 0 3px;">Actual</label><input type="number" value="${h.actual}" onchange="updHousehold(${i},'actual',this.value)"></div>
+            <div>
+              <label style="margin:0 0 3px;">Actual</label>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <div style="flex:1; font-weight:700; padding:11px 0;">${peso(h.actual)}</div>
+                <button class="btn" style="background:var(--teal); color:#fff; padding:10px 14px; font-size:13px;" onclick="addHouseholdExpense(${i})">+ Add</button>
+              </div>
+            </div>
           </div>
         </div>`).join('')}
       <div style="display:flex; gap:8px; margin-top:12px;">
@@ -763,6 +772,27 @@ function addHouseholdCat(){
   const v = document.getElementById('h-new-cat').value.trim();
   if(!v) return;
   state.household.push({cat:v, fil:"", budget:0, actual:0});
+  saveState();
+  render();
+}
+function addHouseholdExpense(i){
+  const input = prompt(`Magkano ang idadagdag sa ${state.household[i].cat}?\n\nHow much to add to ${state.household[i].cat}?`);
+  if(input === null) return;
+  const amt = parseFloat(input);
+  if(isNaN(amt) || amt <= 0){ alert("Please enter a valid amount."); return; }
+  const oldVal = Number(state.household[i].actual)||0;
+  const newVal = oldVal + amt;
+  if(!state.householdHistory) state.householdHistory = [];
+  state.householdHistory.push({cat: state.household[i].cat, field:'actual', oldVal, newVal, by: currentUser||'Unknown', time: new Date().toISOString()});
+  state.household[i].actual = newVal;
+  saveState();
+  render();
+}
+
+function delHouseholdCat(i){
+  const ok = confirm(`Alisin ang "${state.household[i].cat}" sa listahan?\n\nRemove "${state.household[i].cat}" from the list? Past history stays, only future tracking stops.`);
+  if(!ok) return;
+  state.household.splice(i,1);
   saveState();
   render();
 }
