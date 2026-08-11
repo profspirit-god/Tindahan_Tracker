@@ -930,33 +930,39 @@ function changeMonth(v){
 function renderHelp(){
   const tips = [
     "Fill in the Daily Entry every night before closing — it only takes 5 minutes and it's the single habit that fixes everything else.",
-    "Never spend GCash float money on store stock, and never spend store sales money to top up GCash float. Keep them separate in your head and in the app.",
+    "Never spend GCash float money on store stock, and never spend store sales money to top up GCash float. If you use GCash to pay a supplier, log it as a Stock Purchase in Daily Entry, not as GCash Cash-Out — the GCash tab is only for customer cash-in/cash-out service.",
     "Move money to 'Household' once, on a set schedule (e.g. every payday), instead of taking small amounts whenever needed.",
+    "In Household Budget, use '+ Add' when a new expense comes in and '− Fix' if you entered the wrong amount — never retype the whole total from memory.",
     "When a supplier panel arrives unannounced, check the Utang tab first — if this month's due payments are tight, it's okay to say 'next visit' for a non-essential restock.",
     "Review the Monthly Summary together as a family once a month — it's meant to start a conversation, not to blame anyone."
   ];
   return `
   ${header("Help & Tips","Gabay sa Paggamit", true)}
   <main>
-    <div class="banner">This app is shared — anyone in the family who opens it sees the same records. There's no password, so only share it with family.</div>
+    <div class="banner">This app is shared — anyone in the family who opens it sees the same records. There's no password beyond the PIN, so only share it with family.</div>
+
+    <div class="help-h">Pagpasok sa App (Getting In)</div>
+    <p class="help-p"><b>PIN</b> — enter the family PIN once per device; it's remembered after that.</p>
+    <p class="help-p"><b>Pangalan (Name)</b> — the first time on a new device, type your name (Father, Mother, Tita, etc.) so every entry shows who made it. Tap your name in the top-left corner anytime to switch users on that device.</p>
 
     <div class="help-h">Ang Tatlong Supot ng Pera (The 3 Pots)</div>
-    <p class="help-p"><b>1. Store Cash</b> — pera para sa pagtitinda at pambili ng paninda. Ito lang ang ginagalaw sa "Today's Entry".</p>
-    <p class="help-p"><b>2. GCash Float</b> — hiwalay na pera para lang sa cash-in/cash-out. Huwag haluin sa pera ng tindahan.</p>
-    <p class="help-p"><b>3. Household / Bahay</b> — piniling halaga bawat buwan para sa gastos ng pamilya, kinukuha lang isang beses, hindi paisa-isa.</p>
+    <p class="help-p"><b>1. Store Cash</b> — pera para sa pagtitinda at pambili ng paninda. Kahit bayad sa supplier gamit ang GCash, dito pa rin ito ilalagay bilang Stock Purchase.</p>
+    <p class="help-p"><b>2. GCash Float</b> — hiwalay na pera para lang sa cash-in/cash-out ng customer. Huwag ilagay dito ang pambayad sa supplier.</p>
+    <p class="help-p"><b>3. Household / Bahay</b> — piniling halaga bawat buwan para sa gastos ng pamilya.</p>
 
     <div class="help-h">Paano Gamitin</div>
     <p class="help-p"><b>Today's Entry</b> — ilagay ang benta, pambili, at kita sa GCash tuwing gabi bago magsara.</p>
     <p class="help-p"><b>Utang / Loans</b> — bawat may utang na supplier o pautang, ilista dito para may paalala ang due date.</p>
-    <p class="help-p"><b>Household Budget</b> — itakda ang halaga bawat kategorya (upa, pagkain, baon, ilaw). Ito na lang ang kukunin buwan-buwan.</p>
-    <p class="help-p"><b>Top Items</b> — huwag ilista lahat ng paninda — 20-30 pinakamabilis mabenta lang, para hindi mahirapan.</p>
-    <p class="help-p"><b>Monthly Summary</b> — tignan ito minsan sa isang buwan bilang pamilya, para makita kung kumikita talaga ang tindahan.</p>
+    <p class="help-p"><b>Household Budget</b> — gumamit ng '+ Add' kapag may bagong gastos, '− Fix' kung mali ang nailagay. May ✕ din para tanggalin ang isang kategorya kung hindi na ito kailangan.</p>
+    <p class="help-p"><b>View Entry History</b> — makikita dito ang bawat pagbabago sa Household Budget — kailan, magkano, at sino ang gumawa.</p>
+    <p class="help-p"><b>Top Items</b> — huwag ilista lahat ng paninda — 20-30 pinakamabilis mabenta lang.</p>
+    <p class="help-p"><b>Monthly Summary</b> — tignan ito bilang pamilya para makita kung kumikita talaga ang tindahan. I-download bilang Word file para may nakalimbag na kopya.</p>
+    <p class="help-p"><b>Reset for a Clean Slate</b> — buburahin ang Daily Entries, GCash, at Loans; hindi kasama ang Top Items.</p>
 
     <div class="help-h">Tips</div>
     ${tips.map(t=>`<div class="tip">${t}</div>`).join('')}
   </main>`;
 }
-
 
 function delItem(key, idx){
   if(idx<0) return;
