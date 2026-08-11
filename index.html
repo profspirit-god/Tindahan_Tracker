@@ -316,6 +316,7 @@ let state = {
   household: DEFAULT_HOUSEHOLD.map(h=>({...h})),
   inventory: [],
   householdHistory: []
+  stockHistory: []
 };
 let view = "home";
 let loaded = false;
@@ -405,6 +406,7 @@ function render(){
   else if(view==="summary") html = renderSummary();
   else if(view==="help") html = renderHelp();
   else if(view==="insights") html = renderInsights();
+  else if(view==="stockHistory") html = renderStockHistory();
   app.innerHTML = html;
   attachHandlers();
   if(view==="insights"){
@@ -424,7 +426,10 @@ function renderHome(){
       <div class="tile" onclick="go('gcash')"><div class="ic">📲</div><div class="en">GCash</div><div class="fil">Padala't Cash-in</div></div>
       <div class="tile" onclick="go('payables')"><div class="ic">📒</div><div class="en">Utang / Loans</div><div class="fil">Utang sa Supplier</div></div>
       <div class="tile" onclick="go('household')"><div class="ic">🏠</div><div class="en">Household Budget</div><div class="fil">Gastos sa Bahay</div></div>
-      <div class="tile" onclick="go('inventory')"><div class="ic">📦</div><div class="en">Top Items</div><div class="fil">Mga Bentang Paninda</div></div>
+      <div class="tile" onclick="go('inventory')" style="position:relative;">
+        ${state.inventory.filter(r=>Number(r.stock)<=Number(r.reorder)).length>0 ? `<span class="pill overdue" style="position:absolute; top:8px; right:8px;">${state.inventory.filter(r=>Number(r.stock)<=Number(r.reorder)).length}</span>` : ''}
+        <div class="ic">📦</div><div class="en">Top Items</div><div class="fil">Mga Bentang Paninda</div>
+      </div>
       <div class="tile" onclick="go('summary')"><div class="ic">📊</div><div class="en">Monthly Summary</div><div class="fil">Buod ng Buwan</div></div>
       <div class="tile" onclick="go('insights')"><div class="ic">📈</div><div class="en">Insights</div><div class="fil">Mga Tsart at Ranggo</div></div>
     </div>
@@ -851,20 +856,25 @@ function renderInventory(){
     </div>
     <div class="section-title">Item List</div>
     <div class="card">
-      ${rows.length===0 ? `<div class="empty">Wala pang item na naka-list.</div>` : rows.map((r,i)=>{
+     ${rows.length===0 ? `<div class="empty">Wala pang item na naka-list.</div>` : rows.map((r,i)=>{
         const low = Number(r.stock) <= Number(r.reorder);
         const margin = (Number(r.price)||0) - (Number(r.cost)||0);
-        return `<div class="entry">
-          <div>
-            <div><b>${escapeHtml(r.name)}</b> ${low?`<span class="pill overdue">LOW STOCK</span>`:''}</div>
-            <div class="meta">Stock ${r.stock} (reorder at ${r.reorder}) · Margin ${peso(margin)}/unit · by ${r.loggedBy||'-'}</div>
-          </div>
-          <div style="text-align:right;">
+        return `<div class="entry" style="flex-direction:column; align-items:stretch;">
+          <div style="display:flex; justify-content:space-between;">
+            <div>
+              <div><b>${escapeHtml(r.name)}</b> ${low?`<span class="pill overdue">LOW STOCK</span>`:''}</div>
+              <div class="meta">Stock ${r.stock} (reorder at ${r.reorder}) · Margin ${peso(margin)}/unit</div>
+            </div>
             <button class="del" onclick="delItem('inventory', ${i})">✕</button>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button class="btn" style="flex:1; background:var(--teal); color:#fff; padding:9px; font-size:13px;" onclick="restockItem(${i})">+ Restock</button>
+            <button class="btn" style="flex:1; background:var(--bad); color:#fff; padding:9px; font-size:13px;" onclick="sellItem(${i})">− Sold/Used</button>
           </div>
         </div>`;
       }).join('')}
     </div>
+    <button class="btn" style="width:100%; margin-top:14px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="go('stockHistory')">📜 View Stock History</button>
   </main>`;
 }
 function addInventory(){
@@ -880,6 +890,61 @@ function addInventory(){
   });
   saveState();
   render();
+}
+
+function restockItem(i){
+  const input = prompt(`Ilan ang idadagdag sa stock ng ${state.inventory[i].name}?\n\nHow many units to add to ${state.inventory[i].name}?`);
+  if(input === null) return;
+  const qty = parseFloat(input);
+  if(isNaN(qty) || qty <= 0){ alert("Please enter a valid amount."); return; }
+  const oldStock = Number(state.inventory[i].stock)||0;
+  const newStock = oldStock + qty;
+  logStockChange(state.inventory[i].name, 'Restock', qty, oldStock, newStock);
+  state.inventory[i].stock = newStock;
+  saveState();
+  render();
+}
+
+function sellItem(i){
+  const input = prompt(`Ilan ang naibenta/nagamit na ${state.inventory[i].name}?\n\nHow many units sold/used of ${state.inventory[i].name}?`);
+  if(input === null) return;
+  const qty = parseFloat(input);
+  if(isNaN(qty) || qty <= 0){ alert("Please enter a valid amount."); return; }
+  const oldStock = Number(state.inventory[i].stock)||0;
+  const newStock = Math.max(0, oldStock - qty);
+  logStockChange(state.inventory[i].name, 'Sold/Used', -qty, oldStock, newStock);
+  state.inventory[i].stock = newStock;
+  saveState();
+  render();
+}
+
+function logStockChange(itemName, action, qtyChange, oldStock, newStock){
+  if(!state.stockHistory) state.stockHistory = [];
+  state.stockHistory.push({
+    item: itemName, action, qtyChange, oldStock, newStock,
+    by: currentUser || 'Unknown', time: new Date().toISOString()
+  });
+}
+
+function renderStockHistory(){
+  const rows = [...(state.stockHistory||[])].reverse();
+  return `
+  ${header("Stock History","Kasaysayan ng Stock", true)}
+  <main>
+    <button class="btn" style="margin-bottom:14px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="go('inventory')">‹ Back to Top Items</button>
+    <div class="card">
+      ${rows.length===0 ? `<div class="empty">Wala pang history.</div>` : rows.slice(0,150).map(r=>{
+        const dt = new Date(r.time);
+        const dtStr = dt.toLocaleString('en-PH', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+        return `<div class="entry">
+          <div>
+            <div><b>${escapeHtml(r.item)}</b> · ${r.action}</div>
+            <div class="meta">${r.oldStock} → ${r.newStock} (${r.qtyChange>=0?'+':''}${r.qtyChange}) · by ${escapeHtml(r.by)} · ${dtStr}</div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </main>`;
 }
 
 
