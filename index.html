@@ -708,6 +708,7 @@ function renderHousehold(){
               <div style="display:flex; align-items:center; gap:8px;">
                 <div style="flex:1; font-weight:700; padding:11px 0;">${peso(h.actual)}</div>
                 <button class="btn" style="background:var(--teal); color:#fff; padding:10px 14px; font-size:13px;" onclick="addHouseholdExpense(${i})">+ Add</button>
+                <button class="btn" style="background:var(--bad); color:#fff; padding:10px 14px; font-size:13px;" onclick="subtractHouseholdExpense(${i})">− Fix</button> 
               </div>
             </div>
           </div>
@@ -737,7 +738,7 @@ function renderHouseholdHistory(){
       return `<div class="entry">
         <div>
           <div><b>${escapeHtml(r.cat)}</b> · ${r.field}</div>
-          <div class="meta">${peso(r.oldVal)} → ${peso(r.newVal)} · by ${escapeHtml(r.by)} · ${dtStr}</div>
+          <div class="meta">${peso(r.oldVal)} → ${r.newVal==='DELETED' ? 'DELETED' : peso(r.newVal)} · by ${escapeHtml(r.by)} · ${dtStr}</div>
         </div>
       </div>`;
     }).join('')}
@@ -789,14 +790,37 @@ function addHouseholdExpense(i){
   render();
 }
 
-function delHouseholdCat(i){
-  const ok = confirm(`Alisin ang "${state.household[i].cat}" sa listahan?\n\nRemove "${state.household[i].cat}" from the list? Past history stays, only future tracking stops.`);
-  if(!ok) return;
-  state.household.splice(i,1);
+function subtractHouseholdExpense(i){
+  const input = prompt(`Magkano ang babawasin sa ${state.household[i].cat}?\n\nHow much to subtract from ${state.household[i].cat}?`);
+  if(input === null) return;
+  const amt = parseFloat(input);
+  if(isNaN(amt) || amt <= 0){ alert("Please enter a valid amount."); return; }
+  const oldVal = Number(state.household[i].actual)||0;
+  const newVal = Math.max(0, oldVal - amt);
+  if(!state.householdHistory) state.householdHistory = [];
+  state.householdHistory.push({cat: state.household[i].cat, field:'actual', oldVal, newVal, by: currentUser||'Unknown', time: new Date().toISOString()});
+  state.household[i].actual = newVal;
   saveState();
   render();
 }
 
+function delHouseholdCat(i){
+  const catName = state.household[i].cat;
+  const ok = confirm(`Alisin ang "${catName}" sa listahan?\n\nRemove "${catName}" from the list? Past history stays, only future tracking stops.`);
+  if(!ok) return;
+  if(!state.householdHistory) state.householdHistory = [];
+  state.householdHistory.push({
+    cat: catName,
+    field: 'category',
+    oldVal: state.household[i].actual,
+    newVal: 'DELETED',
+    by: currentUser || 'Unknown',
+    time: new Date().toISOString()
+  });
+  state.household.splice(i,1);
+  saveState();
+  render();
+}
 
 function renderInventory(){
   const rows = state.inventory;
