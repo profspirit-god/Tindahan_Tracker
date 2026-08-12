@@ -982,6 +982,14 @@ function renderInventory(){
     </div>
 
     ${(() => {
+      const val = getInventoryValue();
+      return `<div class="card">
+        <div class="sumline"><span>Total Stock Value (at cost)</span><b>${peso(val.costValue)}</b></div>
+        <div class="sumline"><span>Total Potential Sale Value</span><b>${peso(val.saleValue)}</b></div>
+        <div class="sumline"><span>Potential Margin if All Sold</span><b class="amt pos">${peso(val.saleValue - val.costValue)}</b></div>
+      </div>`;
+    })()}
+    ${(() => {
       const soon = state.inventory.filter(r => daysUntil(r.expiryDate)!==null && daysUntil(r.expiryDate)<=7);
       if(soon.length===0) return '';
       return `<div class="card" style="border:1.5px solid #7A4E00; background:#FCF3DF;">
@@ -1012,6 +1020,12 @@ function renderInventory(){
           <div class="sumline"><span>Sell Price</span><b>${peso(r.price)}</b></div>
           <div class="sumline"><span>Margin / Unit</span><b>${peso(margin)}</b></div>
           <div class="sumline"><span>Reorder At</span><b>${r.reorder} ${r.unit}</b></div>
+          <div class="sumline"><span>Est. Days of Stock Left</span><b>${(() => {
+            const rate = getDailySellRate(r.name);
+            if(rate <= 0) return 'Not enough sales data yet';
+            const days = Math.round((Number(r.stock)||0) / rate);
+            return `~${days} day${days===1?'':'s'} (based on last 14 days)`;
+          })()}</b></div>
           <div style="display:flex; gap:8px; margin-top:10px;">
             <button class="btn" style="flex:1; background:var(--teal); color:#fff; padding:9px; font-size:13px;" onclick="restockItem(${r._idx})">+ Restock</button>
             <button class="btn" style="flex:1; background:var(--bad); color:#fff; padding:9px; font-size:13px;" onclick="sellItem(${r._idx})">− Sold</button>
@@ -1088,6 +1102,26 @@ function spoilItem(i){
   state.inventory[i].stock = newStock;
   saveState();
   render();
+}
+
+function getInventoryValue(){
+  return state.inventory.reduce((acc, r)=>{
+    const stock = Number(r.stock)||0;
+    acc.costValue += stock * (Number(r.cost)||0);
+    acc.saleValue += stock * (Number(r.price)||0);
+    return acc;
+  }, {costValue:0, saleValue:0});
+}
+
+function getDailySellRate(itemName, windowDays){
+  windowDays = windowDays || 14;
+  const cutoff = Date.now() - windowDays*86400000;
+  const sold = (state.stockHistory||[]).filter(h=>
+    h.item===itemName && h.action==='Sold/Used' && new Date(h.time).getTime() >= cutoff
+  );
+  if(sold.length===0) return 0;
+  const totalQty = sold.reduce((s,h)=>s+Math.abs(h.qtyChange||0),0);
+  return totalQty / windowDays;
 }
 
 function logStockChange(itemName, action, qtyChange, oldStock, newStock){
