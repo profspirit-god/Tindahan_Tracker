@@ -218,6 +218,7 @@ const sb = supabase.createClient(
 );
 
 const STORE_PIN = "2808";
+const HISTORY_PASSKEY = "2806";
 
 function checkPin(){
   const val = document.getElementById('lock-input').value;
@@ -369,6 +370,16 @@ function go(v){
   if(v === "home" || v === "summary"){
     quickRefresh();
   }
+}
+
+function goHistoryProtected(){
+  const input = prompt("Enter the History passkey:");
+  if(input === null) return; // cancelled
+  if(input !== HISTORY_PASSKEY){
+    alert("Wrong passkey.");
+    return;
+  }
+  go('householdHistory');
 }
 
 async function quickRefresh(){
@@ -731,7 +742,7 @@ function renderHousehold(){
         <button class="btn" style="background:var(--brass); color:#fff;" onclick="addHouseholdCat()">+</button>
       </div>
     </div>
-    <button class='btn' style="width:100%; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="go('householdHistory')">📜 View Entry History</button>
+    <button class="btn" style="width:100%; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="goHistoryProtected()">📜 View Entry History</button>
     <div class="card">
       <div class="sumline"><span>Total Budget</span><b>${peso(total)}</b></div>
       <div class="sumline"><span>Total Actual</span><b>${peso(totalActual)}</b></div>
