@@ -192,6 +192,17 @@
 #chart-modal .modal-close{background:var(--bad); color:#fff; border:none; width:38px; height:38px; border-radius:10px; font-size:20px;}
 #chart-modal .modal-body{flex:1; background:#fff; border-radius:14px; padding:16px; display:flex; align-items:center;}
 
+.search-row{display:flex; gap:8px; align-items:center; margin-bottom:10px;}
+.search-row input{flex:1;}
+.filter-row{display:flex; gap:8px; margin-bottom:14px;}
+.filter-row select{flex:1; font-size:13px; padding:9px;}
+.code-badge{font-size:11px; font-weight:700; background:#EFE6CE; color:var(--brass); padding:2px 8px; border-radius:6px; margin-left:6px;}
+.item-row{background:#fff; border:1px solid var(--page-line); border-radius:12px; margin-bottom:10px; overflow:hidden;}
+.item-row-head{padding:12px 14px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;}
+.item-row-body{padding:0 14px 14px; border-top:1px dashed var(--page-line);}
+.chevron{transition:transform .15s; color:var(--ink-soft);}
+.chevron.open{transform:rotate(90deg);}
+
 </style>
 </head>
 <body>
@@ -329,6 +340,36 @@ const DEFAULT_HOUSEHOLD = [
   {cat:"Wifi", fil:"Wifi", budget:1206, actual:0},
 ];
 
+const CATEGORIES = ["Grocery","Beverages","Frozen","Dry Goods","Produce","Meat","Household","Toiletries","Other"];
+const STORAGE_TYPES = ["Frozen","Chilled","Dry","Perishable"];
+const UNITS = ["pcs","kg","g","L","mL","dozen","pack","sack","bottle","can"];
+const CATEGORY_PREFIX = {
+  "Grocery":"GRO","Beverages":"BEV","Frozen":"FRZ","Dry Goods":"DRY",
+  "Produce":"PRD","Meat":"MEA","Household":"HHD","Toiletries":"TOI","Other":"GEN"
+};
+
+function generateProductCode(category){
+  const prefix = CATEGORY_PREFIX[category] || "GEN";
+  let maxNum = 0;
+  state.inventory.forEach(it=>{
+    if(it.code && it.code.startsWith(prefix+"-")){
+      const num = parseInt(it.code.split('-')[1],10);
+      if(!isNaN(num) && num>maxNum) maxNum = num;
+    }
+  });
+  return `${prefix}-${String(maxNum+1).padStart(4,'0')}`;
+}
+
+function ensureInventoryFields(){
+  state.inventory.forEach(it=>{
+    if(!it.category) it.category = "Other";
+    if(!it.storageType) it.storageType = "Dry";
+    if(!it.unit) it.unit = "pcs";
+    if(!it.supplier) it.supplier = "";
+    if(!it.code) it.code = generateProductCode(it.category);
+  });
+}
+
 let state = {
   dailyLogs: [],
   gcashLogs: [],
@@ -340,6 +381,11 @@ let state = {
 };
 let view = "home";
 let loaded = false;
+
+let invSearch = "";
+let invCategoryFilter = "All";
+let invStorageFilter = "All";
+let expandedItemIdx = -1;
 
 function peso(n){
   n = Number(n)||0;
@@ -875,14 +921,52 @@ function delHouseholdCat(i){
 }
 
 function renderInventory(){
-  const rows = state.inventory;
+  const rows = state.inventory
+    .map((r,i)=>({...r,_idx:i}))
+    .filter(r=>{
+      if(invCategoryFilter!=="All" && r.category!==invCategoryFilter) return false;
+      if(invStorageFilter!=="All" && r.storageType!==invStorageFilter) return false;
+      if(invSearch.trim()){
+        const q = invSearch.toLowerCase();
+        if(!r.name.toLowerCase().includes(q) && !(r.code||"").toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+
   return `
   ${header("Top Items","Mga bentang paninda na kailangang bantayan", true)}
   <main>
-    <p class="subtitle">Track only your ~20–30 fastest-moving or highest-value items — not everything in the store.</p>
+    <div class="search-row">
+      <input type="text" placeholder="🔍 Search name or code…" value="${escapeHtml(invSearch)}" oninput="setInvSearch(this.value)">
+    </div>
+    <div class="filter-row">
+      <select onchange="setInvCategoryFilter(this.value)">
+        <option value="All">All Categories</option>
+        ${CATEGORIES.map(c=>`<option value="${c}" ${invCategoryFilter===c?'selected':''}>${c}</option>`).join('')}
+      </select>
+      <select onchange="setInvStorageFilter(this.value)">
+        <option value="All">All Storage</option>
+        ${STORAGE_TYPES.map(s=>`<option value="${s}" ${invStorageFilter===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+    </div>
+
     <div class="card">
       <label>Item Name</label>
       <input type="text" id="i-name" placeholder="e.g. Bottled water 500ml">
+      <div class="row2">
+        <div><label>Category</label>
+          <select id="i-category">${CATEGORIES.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>
+        </div>
+        <div><label>Storage Type</label>
+          <select id="i-storage">${STORAGE_TYPES.map(s=>`<option value="${s}">${s}</option>`).join('')}</select>
+        </div>
+      </div>
+      <div class="row2">
+        <div><label>Unit</label>
+          <select id="i-unit">${UNITS.map(u=>`<option value="${u}">${u}</option>`).join('')}</select>
+        </div>
+        <div><label>Supplier</label><input type="text" id="i-supplier" placeholder="Optional"></div>
+      </div>
       <div class="row2">
         <div><label>Cost / Unit (₱)</label><input type="number" id="i-cost" placeholder="0"></div>
         <div><label>Sell Price (₱)</label><input type="number" id="i-price" placeholder="0"></div>
@@ -893,39 +977,59 @@ function renderInventory(){
       </div>
       <button class="btn btn-primary" onclick="addInventory()">Save Item</button>
     </div>
-    <div class="section-title">Item List</div>
-    <div class="card">
-     ${rows.length===0 ? `<div class="empty">Wala pang item na naka-list.</div>` : rows.map((r,i)=>{
-        const low = Number(r.stock) <= Number(r.reorder);
-        const margin = (Number(r.price)||0) - (Number(r.cost)||0);
-        return `<div class="entry" style="flex-direction:column; align-items:stretch;">
-          <div style="display:flex; justify-content:space-between;">
-            <div>
-              <div><b>${escapeHtml(r.name)}</b> ${low?`<span class="pill overdue">LOW STOCK</span>`:''}</div>
-              <div class="meta">Stock ${r.stock} (reorder at ${r.reorder}) · Margin ${peso(margin)}/unit</div>
-            </div>
-            <button class="del" onclick="delItem('inventory', ${i})">✕</button>
+
+    <div class="section-title">Item List (${rows.length})</div>
+    ${rows.length===0 ? `<div class="card"><div class="empty">Walang item na tugma.</div></div>` : rows.map(r=>{
+      const low = Number(r.stock) <= Number(r.reorder);
+      const margin = (Number(r.price)||0) - (Number(r.cost)||0);
+      const isOpen = expandedItemIdx === r._idx;
+      return `<div class="item-row">
+        <div class="item-row-head" onclick="toggleExpand(${r._idx})">
+          <div>
+            <b>${escapeHtml(r.name)}</b><span class="code-badge">${r.code}</span> ${low?`<span class="pill overdue">LOW</span>`:''}
+            <div class="meta">Stock: ${r.stock} ${r.unit} · ${r.category}</div>
           </div>
-          <div style="display:flex; gap:8px; margin-top:8px;">
-            <button class="btn" style="flex:1; background:var(--teal); color:#fff; padding:9px; font-size:13px;" onclick="restockItem(${i})">+ Restock</button>
-            <button class="btn" style="flex:1; background:var(--bad); color:#fff; padding:9px; font-size:13px;" onclick="sellItem(${i})">− Sold/Used</button>
+          <span class="chevron ${isOpen?'open':''}">▶</span>
+        </div>
+        ${isOpen ? `<div class="item-row-body">
+          <div class="sumline"><span>Storage Type</span><b>${r.storageType}</b></div>
+          <div class="sumline"><span>Supplier</span><b>${escapeHtml(r.supplier)||'—'}</b></div>
+          <div class="sumline"><span>Cost / Unit</span><b>${peso(r.cost)}</b></div>
+          <div class="sumline"><span>Sell Price</span><b>${peso(r.price)}</b></div>
+          <div class="sumline"><span>Margin / Unit</span><b>${peso(margin)}</b></div>
+          <div class="sumline"><span>Reorder At</span><b>${r.reorder} ${r.unit}</b></div>
+          <div style="display:flex; gap:8px; margin-top:10px;">
+            <button class="btn" style="flex:1; background:var(--teal); color:#fff; padding:9px; font-size:13px;" onclick="restockItem(${r._idx})">+ Restock</button>
+            <button class="btn" style="flex:1; background:var(--bad); color:#fff; padding:9px; font-size:13px;" onclick="sellItem(${r._idx})">− Sold/Used</button>
           </div>
-        </div>`;
-      }).join('')}
-    </div>
-    <button class="btn" style="width:100%; margin-top:14px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="go('stockHistory')">📜 View Stock History</button>
+          <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--bad); color:var(--bad); padding:8px; font-size:13px;" onclick="delItem('inventory', ${r._idx})">Delete Item</button>
+        </div>` : ''}
+      </div>`;
+    }).join('')}
+
+    <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="go('stockHistory')">📜 View Stock History</button>
   </main>`;
 }
+
+function setInvSearch(v){ invSearch = v; render(); }
+function setInvCategoryFilter(v){ invCategoryFilter = v; render(); }
+function setInvStorageFilter(v){ invStorageFilter = v; render(); }
+function toggleExpand(i){ expandedItemIdx = (expandedItemIdx===i) ? -1 : i; render(); }
+
 function addInventory(){
   const name = document.getElementById('i-name').value.trim();
   if(!name) return;
+  const category = document.getElementById('i-category').value;
+  const code = generateProductCode(category);
   state.inventory.push({
-    name,
+    code, name, category,
+    storageType: document.getElementById('i-storage').value,
+    unit: document.getElementById('i-unit').value,
+    supplier: document.getElementById('i-supplier').value.trim(),
     cost: parseFloat(document.getElementById('i-cost').value)||0,
     price: parseFloat(document.getElementById('i-price').value)||0,
     stock: parseFloat(document.getElementById('i-stock').value)||0,
-    reorder: parseFloat(document.getElementById('i-reorder').value)||0,
-    loggedBy: currentUser
+    reorder: parseFloat(document.getElementById('i-reorder').value)||0
   });
   saveState();
   render();
@@ -1282,6 +1386,7 @@ function startApp(){
   (async function(){
     render ();
     await loadState();
+    ensureInventoryFields();
     ensureUsername();
     render();
     startAutoRefresh();
