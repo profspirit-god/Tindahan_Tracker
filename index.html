@@ -367,6 +367,7 @@ function ensureInventoryFields(){
     if(!it.unit) it.unit = "pcs";
     if(!it.supplier) it.supplier = "";
     if(!it.code) it.code = generateProductCode(it.category);
+    if(it.expiryDate === undefined) it.expiryDate = "";
   });
 }
 
@@ -975,9 +976,21 @@ function renderInventory(){
         <div><label>Current Stock</label><input type="number" id="i-stock" placeholder="0"></div>
         <div><label>Reorder Point</label><input type="number" id="i-reorder" placeholder="0"></div>
       </div>
+      <label>Expiry Date <span style="font-weight:400; color:var(--ink-soft);">(optional — Frozen/Perishable)</span></label>
+      <input type="date" id="i-expiry">
       <button class="btn btn-primary" onclick="addInventory()">Save Item</button>
     </div>
 
+    ${(() => {
+      const soon = state.inventory.filter(r => daysUntil(r.expiryDate)!==null && daysUntil(r.expiryDate)<=7);
+      if(soon.length===0) return '';
+      return `<div class="card" style="border:1.5px solid #7A4E00; background:#FCF3DF;">
+        <b style="color:#7A4E00;">⚠️ Expiring within 7 days (${soon.length})</b>
+        ${soon.sort((a,b)=>daysUntil(a.expiryDate)-daysUntil(b.expiryDate)).map(r=>
+          `<div class="sumline"><span>${escapeHtml(r.name)}</span><b>${daysUntil(r.expiryDate)<0?'EXPIRED':daysUntil(r.expiryDate)+'d left'}</b></div>`
+        ).join('')}
+      </div>`;
+    })()}
     <div class="section-title">Item List (${rows.length})</div>
     ${rows.length===0 ? `<div class="card"><div class="empty">Walang item na tugma.</div></div>` : rows.map(r=>{
       const low = Number(r.stock) <= Number(r.reorder);
@@ -986,13 +999,14 @@ function renderInventory(){
       return `<div class="item-row">
         <div class="item-row-head" onclick="toggleExpand(${r._idx})">
           <div>
-            <b>${escapeHtml(r.name)}</b><span class="code-badge">${r.code}</span> ${low?`<span class="pill overdue">LOW</span>`:''}
+            <b>${escapeHtml(r.name)}</b><span class="code-badge">${r.code}</span> ${low?`<span class="pill overdue">LOW</span>`:''} ${(daysUntil(r.expiryDate)!==null && daysUntil(r.expiryDate)<=7) ? `<span class="pill overdue" style="background:#F4D9A0; color:#7A4E00;">${daysUntil(r.expiryDate)<0?'EXPIRED':'EXPIRING SOON'}</span>` : ''}
             <div class="meta">Stock: ${r.stock} ${r.unit} · ${r.category}</div>
           </div>
           <span class="chevron ${isOpen?'open':''}">▶</span>
         </div>
         ${isOpen ? `<div class="item-row-body">
           <div class="sumline"><span>Storage Type</span><b>${r.storageType}</b></div>
+          <div class="sumline"><span>Expiry Date</span><b>${r.expiryDate || 'Not set'}</b></div>
           <div class="sumline"><span>Supplier</span><b>${escapeHtml(r.supplier)||'—'}</b></div>
           <div class="sumline"><span>Cost / Unit</span><b>${peso(r.cost)}</b></div>
           <div class="sumline"><span>Sell Price</span><b>${peso(r.price)}</b></div>
@@ -1000,8 +1014,9 @@ function renderInventory(){
           <div class="sumline"><span>Reorder At</span><b>${r.reorder} ${r.unit}</b></div>
           <div style="display:flex; gap:8px; margin-top:10px;">
             <button class="btn" style="flex:1; background:var(--teal); color:#fff; padding:9px; font-size:13px;" onclick="restockItem(${r._idx})">+ Restock</button>
-            <button class="btn" style="flex:1; background:var(--bad); color:#fff; padding:9px; font-size:13px;" onclick="sellItem(${r._idx})">− Sold/Used</button>
+            <button class="btn" style="flex:1; background:var(--bad); color:#fff; padding:9px; font-size:13px;" onclick="sellItem(${r._idx})">− Sold</button>
           </div>
+          <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid #7A4E00; color:#7A4E00; padding:9px; font-size:13px;" onclick="spoilItem(${r._idx})">🗑 Spoiled / Wasted</button>
           <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--bad); color:var(--bad); padding:8px; font-size:13px;" onclick="delItem('inventory', ${r._idx})">Delete Item</button>
         </div>` : ''}
       </div>`;
@@ -1029,7 +1044,8 @@ function addInventory(){
     cost: parseFloat(document.getElementById('i-cost').value)||0,
     price: parseFloat(document.getElementById('i-price').value)||0,
     stock: parseFloat(document.getElementById('i-stock').value)||0,
-    reorder: parseFloat(document.getElementById('i-reorder').value)||0
+    reorder: parseFloat(document.getElementById('i-reorder').value)||0,
+    expiryDate: document.getElementById('i-expiry').value || ""
   });
   saveState();
   render();
@@ -1056,6 +1072,19 @@ function sellItem(i){
   const oldStock = Number(state.inventory[i].stock)||0;
   const newStock = Math.max(0, oldStock - qty);
   logStockChange(state.inventory[i].name, 'Sold/Used', -qty, oldStock, newStock);
+  state.inventory[i].stock = newStock;
+  saveState();
+  render();
+}
+
+function spoilItem(i){
+  const input = prompt(`Ilan ang nasira/naaksaya na ${state.inventory[i].name}?\n\nHow many units of ${state.inventory[i].name} were spoiled/wasted?`);
+  if(input === null) return;
+  const qty = parseFloat(input);
+  if(isNaN(qty) || qty <= 0){ alert("Please enter a valid amount."); return; }
+  const oldStock = Number(state.inventory[i].stock)||0;
+  const newStock = Math.max(0, oldStock - qty);
+  logStockChange(state.inventory[i].name, 'Spoiled/Wasted', -qty, oldStock, newStock);
   state.inventory[i].stock = newStock;
   saveState();
   render();
@@ -1088,6 +1117,13 @@ function renderStockHistory(){
       }).join('')}
     </div>
   </main>`;
+}
+
+function daysUntil(dateStr){
+  if(!dateStr) return null;
+  const today = new Date(todayStr());
+  const target = new Date(dateStr);
+  return Math.round((target - today) / 86400000);
 }
 
 
