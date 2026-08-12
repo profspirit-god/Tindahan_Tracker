@@ -739,24 +739,33 @@ function renderHousehold(){
   </main>`;
 }
 function renderHouseholdHistory(){
-  const rows = [...(state.householdHistory||[])].reverse();
+  const indexed = (state.householdHistory||[]).map((r,i)=>({...r, _idx:i})).reverse();
   return `
   ${header("Household History","Kasaysayan ng mga Pagbabago", true)}
   <main>
     <button class="btn" style="margin-bottom:14px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="go('household')">‹ Back to Household</button>
     <div class="card">
-      ${rows.lenght===0 ? `<div class="empty">Wala Pang history.</div>` : rows.slice(0,150).map(r=>{
-      const dt = new Date(r.time);
-      const dtStr = dt.toLocaleString('en-PH', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
-      return `<div class="entry">
-        <div>
-          <div><b>${escapeHtml(r.cat)}</b> · ${r.field}</div>
-          <div class="meta">${peso(r.oldVal)} → ${r.newVal==='DELETED' ? 'DELETED' : peso(r.newVal)} · by ${escapeHtml(r.by)} · ${dtStr}</div>
-        </div>
-      </div>`;
-    }).join('')}
+      ${indexed.length===0 ? `<div class="empty">Wala pang history.</div>` : indexed.slice(0,150).map(r=>{
+        const dt = new Date(r.time);
+        const dtStr = dt.toLocaleString('en-PH', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+        return `<div class="entry">
+          <div>
+            <div><b>${escapeHtml(r.cat)}</b> · ${r.field}</div>
+            <div class="meta">${peso(r.oldVal)} → ${r.newVal==='DELETED' ? 'DELETED' : peso(r.newVal)} · by ${escapeHtml(r.by)} · ${dtStr}</div>
+          </div>
+          <button class="del" onclick="delHistoryEntry(${r._idx})">✕</button>
+        </div>`;
+      }).join('')}
     </div>
   </main>`;
+}
+
+function delHistoryEntry(idx){
+  const ok = confirm("Tanggalin ang entry na ito sa history? Hindi ito maibabalik.\n\nDelete this history entry? This cannot be undone.");
+  if(!ok) return;
+  state.householdHistory.splice(idx, 1);
+  saveState();
+  render();
 }
 function updHousehold(i,field,val){
   const oldVal = Number(state.household[i][field]) ||0;
