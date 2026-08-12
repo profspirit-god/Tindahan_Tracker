@@ -1046,7 +1046,7 @@ function renderInsights(){
     <label>Select Month</label>
     <select id="ins-month" onchange="changeMonth(this.value)">${monthOptions}</select>
 
-    <div class="section-title" style="margin-top:16px;">Income vs Store Expenses</div>
+    <div class="section-title" style="margin-top:16px;">Revenue, Expenses & Profit</div>
     <div class="card"><canvas id="incomeExpenseCanvas" height="220"></canvas></div>
 
     <div class="section-title">Household Spending by Category</div>
@@ -1120,8 +1120,9 @@ function drawInsightCharts(sel){
       data: {
         labels: daily.map(d=>d.date.slice(8,10)),
         datasets: [
-          {label:'Income', data: daily.map(d=>d.income), borderColor:'#2C6E7F', backgroundColor:'#2C6E7F', tension:0.2},
-          {label:'Store Expense', data: daily.map(d=>d.expense), borderColor:'#8C3A32', backgroundColor:'#8C3A32', tension:0.2}
+          {label:'Revenue (Gross Income)', data: daily.map(d=>d.income), borderColor:'#2C6E7F', backgroundColor:'#2C6E7F', tension:0.2},
+          {label:'Store Expenses', data: daily.map(d=>d.expense), borderColor:'#8C3A32', backgroundColor:'#8C3A32', tension:0.2},
+          {label:'Profit (Net)', data: daily.map(d=>d.net), borderColor:'#A9762F', backgroundColor:'#A9762F', tension:0.2, borderDash:[6,3]}
         ]
       },
       options: { responsive:true, plugins:{legend:{position:'bottom'}} }
