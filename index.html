@@ -203,6 +203,36 @@
 .chevron{transition:transform .15s; color:var(--ink-soft);}
 .chevron.open{transform:rotate(90deg);}
 
+:root{ --sidebar-w: 260px; }
+#app-shell{ position:relative; max-width:520px; margin:0 auto; }
+#hamburger-btn{
+  position:fixed; top:14px; left:14px; z-index:30;
+  background:var(--cover); color:#fff; border:none; width:42px; height:42px;
+  border-radius:10px; font-size:20px; box-shadow:0 2px 8px rgba(0,0,0,.3);
+}
+#sidebar{
+  position:fixed; top:0; left:0; bottom:0; width:var(--sidebar-w); z-index:40;
+  background:var(--cover-dark); color:var(--page); transform:translateX(-100%);
+  transition:transform .2s ease; display:flex; flex-direction:column; padding:18px 14px;
+  overflow-y:auto;
+}
+#sidebar.open{ transform:translateX(0); }
+#sidebar-overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:35;
+  display:none;
+}
+#sidebar-overlay.open{ display:block; }
+.sb-user{ display:flex; align-items:center; gap:8px; padding:10px 8px 18px; border-bottom:1px solid rgba(255,255,255,.15); margin-bottom:12px; font-size:13.5px; font-weight:600; }
+.sb-link{
+  display:flex; align-items:center; gap:12px; padding:12px 10px; border-radius:10px;
+  color:var(--page); text-decoration:none; font-size:14.5px; font-weight:600; cursor:pointer;
+  margin-bottom:2px;
+}
+.sb-link:active, .sb-link.active{ background:rgba(255,255,255,.12); }
+.sb-link .ic{ font-size:18px; width:22px; text-align:center; }
+.sb-divider{ height:1px; background:rgba(255,255,255,.12); margin:10px 0; }
+.sb-version{ margin-top:auto; padding-top:14px; font-size:11px; color:rgba(255,255,255,.5); text-align:center; }
+
 </style>
 </head>
 <body>
@@ -213,7 +243,14 @@
   <div id="lock-error"></div>
   <button id="lock-btn" onclick="checkPin()">Unlock</button>
 </div>
-<div id="app"></div>
+<body>
+<div id="sync-banner" style="display:none; ..."></div>
+<button id="hamburger-btn" onclick="toggleSidebar()">☰</button>
+<div id="sidebar-overlay" onclick="toggleSidebar()"></div>
+<div id="sidebar"></div>
+<div id="app-shell">
+  <div id="app"></div>
+</div>
 
 <div id="chart-modal">
   <div class="modal-header">
@@ -347,6 +384,39 @@ const CATEGORY_PREFIX = {
   "Grocery":"GRO","Beverages":"BEV","Frozen":"FRZ","Dry Goods":"DRY",
   "Produce":"PRD","Meat":"MEA","Household":"HHD","Toiletries":"TOI","Other":"GEN"
 };
+
+const APP_VERSION = "v18"; // bump this by hand with each future commit
+
+const NAV_ITEMS = [
+  {view:'daily', ic:'🗓️', label:"Today's Entry"},
+  {view:'gcash', ic:'📲', label:'GCash'},
+  {view:'household', ic:'💵', label:'Household Budget'},
+  {view:'payables', ic:'📒', label:'Utang / Loans'},
+  {view:'inventory', ic:'📦', label:'Top Items'},
+  {view:'insights', ic:'📈', label:'Insights'},
+  {view:'help', ic:'💡', label:'Help & Tips'},
+];
+
+function renderSidebar(){
+  const sb = document.getElementById('sidebar');
+  if(!sb) return;
+  sb.innerHTML = `
+    <div class="sb-user">👤 ${escapeHtml(currentUser||'—')}</div>
+    <div class="sb-link ${view==='home'?'active':''}" onclick="navFromSidebar('home')"><span class="ic">🏠</span> Store Health</div>
+    <div class="sb-divider"></div>
+    ${NAV_ITEMS.map(n=>`<div class="sb-link ${view===n.view?'active':''}" onclick="navFromSidebar('${n.view}')"><span class="ic">${n.ic}</span> ${n.label}</div>`).join('')}
+    <div class="sb-version">Tindahan Tracker · ${APP_VERSION}</div>
+  `;
+}
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('open');
+}
+function navFromSidebar(v){
+  toggleSidebar();
+  go(v);
+}
+
 
 function generateProductCode(category){
   const prefix = CATEGORY_PREFIX[category] || "GEN";
@@ -486,6 +556,7 @@ function render(){
   else if(view==="stockHistory") html = renderStockHistory();
   app.innerHTML = html;
   attachHandlers();
+  renderSidebar();
   if(view==="insights"){
     const now = new Date();
     drawInsightCharts(window._selMonth || now.toISOString().slice(0,7));
