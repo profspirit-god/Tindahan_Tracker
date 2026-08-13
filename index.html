@@ -74,11 +74,7 @@
   }
   #username-error{color:#F4A9A0; font-size:13px; min-height:16px;}
   #username-claim{background:none; border:none; color:var(--brass-light); text-decoration:underline; font-size:12.5px; cursor:pointer;}
-  #user-badge{
-    position:fixed; top:10px; left:10px; z-index:20;
-    background:rgb(0,0,0,.35); color:#fff; font-size:12.5px; font-weight:600;
-    padding:6px 12px; border-radius:20px; cursor:pointer;
-  }
+ 
   header.top{
     background:var(--cover);
     background-image: linear-gradient(180deg, var(--cover), var(--cover-dark));
@@ -222,7 +218,7 @@
   display:none;
 }
 #sidebar-overlay.open{ display:block; }
-.sb-user{ display:flex; align-items:center; gap:8px; padding:10px 8px 18px; border-bottom:1px solid rgba(255,255,255,.15); margin-bottom:12px; font-size:13.5px; font-weight:600; }
+.sb-user{ display:flex; align-items:center; gap:8px; padding:10px 8px 18px; border-bottom:1px solid rgba(255,255,255,.15); margin-bottom:12px; font-size:13.5px; font-weight:600; justify-content: space-between; }
 .sb-link{
   display:flex; align-items:center; gap:12px; padding:12px 10px; border-radius:10px;
   color:var(--page); text-decoration:none; font-size:14.5px; font-weight:600; cursor:pointer;
@@ -268,7 +264,6 @@
   <button id="lock-btn" onclick="submitUsername()">Continue</button>
   <button id="username-claim" style="display:none;" onclick="claimExistingName()">This is me - I'm using a new device</button>
 </div>
-<div id="user-badge" onclick="switchUser()"></div>
 
 <script
 src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
@@ -302,8 +297,7 @@ let currentUser = localStorage.getItem('storeUsername') || null;
 let pendingClaimName = "";
 
 function updateUserBadge(){
-  const badge = document.getElementById('user-badge');
-  if(badge) badge.textContent = currentUser ? `👤 ${currentUser} (tap to switch)` : '';
+  
 }
 
 function ensureUsername(){
@@ -385,7 +379,7 @@ const CATEGORY_PREFIX = {
   "Produce":"PRD","Meat":"MEA","Household":"HHD","Toiletries":"TOI","Other":"GEN"
 };
 
-const APP_VERSION = "v19.4.4"; // bump this by hand with each future commit
+const APP_VERSION = "v19.4.5"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -402,7 +396,7 @@ function renderSidebar(){
   const sb = document.getElementById('sidebar');
   if(!sb) return;
   sb.innerHTML = `
-    <div class="sb-user">👤 ${escapeHtml(currentUser||'—')}</div>
+    <div class="sb-user" style="cursor:pointer;" onclick="switchUser()">👤 ${escapeHtml(currentUser||'—')} <span style="font-size:11px; opacity:.7; margin-left:auto;">(tap to switch)</span></div>
     <div class="sb-link ${view==='home'?'active':''}" onclick="navFromSidebar('home')"><span class="ic">🏠</span> Store Health</div>
     <div class="sb-divider"></div>
     ${NAV_ITEMS.map(n=>`<div class="sb-link ${view===n.view?'active':''}" onclick="navFromSidebar('${n.view}')"><span class="ic">${n.ic}</span> ${n.label}</div>`).join('')}
