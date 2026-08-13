@@ -79,7 +79,7 @@
     background:var(--cover);
     background-image: linear-gradient(180deg, var(--cover), var(--cover-dark));
     color:var(--page);
-    padding:22px 20px 18px;
+    padding:22px 20px 18px 66px;
     position:sticky; top:0; z-index:5;
     box-shadow:0 3px 10px rgba(0,0,0,.25);
   }
@@ -88,14 +88,7 @@
     font-size:26px; margin:0; letter-spacing:.3px;
   }
   header.top p{margin:4px 0 0; font-size:13px; color:var(--brass-light); font-weight:500;}
-  .backbar{
-    display:flex; align-items:center; gap:10px;
-  }
-  .backbtn{
-    background:rgba(255,255,255,.12); border:none; color:var(--page);
-    width:38px; height:38px; border-radius:10px; font-size:20px; cursor:pointer;
-    display:flex; align-items:center; justify-content:center; flex-shrink:0;
-  }
+
   .backbtn:active{background:rgba(255,255,255,.25);}
   main{padding:18px 20px 10px; position:relative;}
   .grid-home{
@@ -379,7 +372,7 @@ const CATEGORY_PREFIX = {
   "Produce":"PRD","Meat":"MEA","Household":"HHD","Toiletries":"TOI","Other":"GEN"
 };
 
-const APP_VERSION = "v19.4.5"; // bump this by hand with each future commit
+const APP_VERSION = "v19.5.5"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -532,15 +525,12 @@ async function quickRefresh(){
   render();
 }
 
-function header(title, filTitle, showBack){
+function header(title, filTitle){
   return `
   <header class="top">
-    <div class="backbar">
-      ${showBack ? `<button class="backbtn" onclick="go('home')">‹</button>` : ''}
-      <div>
-        <h1>${title}</h1>
-        ${filTitle ? `<p>${filTitle}</p>` : ''}
-      </div>
+    <div>
+      <h1>${title}</h1>
+      ${filTitle ? `<p>${filTitle}</p>` : ''}
     </div>
   </header>`;
 }
