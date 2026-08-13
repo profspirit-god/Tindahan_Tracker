@@ -385,7 +385,7 @@ const CATEGORY_PREFIX = {
   "Produce":"PRD","Meat":"MEA","Household":"HHD","Toiletries":"TOI","Other":"GEN"
 };
 
-const APP_VERSION = "v18.4.1"; // bump this by hand with each future commit
+const APP_VERSION = "v18.4.2"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -483,20 +483,24 @@ async function loadState(){
     .eq("id", 1)
     .single();
 
-  if (!error && data.data) { state = Object.assign(state, data.data);
-
+  if (!error && data.data) {
+    state = Object.assign(state, data.data);
     if (!state.household || state.household.length === 0) {
       state.household = DEFAULT_HOUSEHOLD.map(h => ({ ...h }));
     }
+    syncStatus = "ok";
+  } else {
+    syncStatus = "error";
   }
   loaded = true;
 }
 
 async function saveState(){
-  await sb
+  const { error } = await sb
     .from("app_state")
     .update({ data: state })
     .eq("id", 1);
+  syncStatus = error ? "error" : "ok";
 }
 
 function go(v){
