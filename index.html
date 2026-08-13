@@ -366,13 +366,13 @@ const DEFAULT_HOUSEHOLD = [
 
 const CATEGORIES = ["Grocery","Beverages","Frozen","Dry Goods","Produce","Meat","Household","Toiletries","Other"];
 const STORAGE_TYPES = ["Frozen","Chilled","Dry","Perishable"];
-const UNITS = ["pcs","kg","g","L","mL","dozen","pack","sack","bottle","can"];
+const UNITS = ["pcs","bottle","can","box","sachet","pack","dozen","sack","kg","g","L","mL","oz"];
 const CATEGORY_PREFIX = {
   "Grocery":"GRO","Beverages":"BEV","Frozen":"FRZ","Dry Goods":"DRY",
   "Produce":"PRD","Meat":"MEA","Household":"HHD","Toiletries":"TOI","Other":"GEN"
 };
 
-const APP_VERSION = "v19.5.5"; // bump this by hand with each future commit
+const APP_VERSION = "v19.5.6"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -1107,7 +1107,7 @@ function renderInventory(){
         </div>
       </div>
       <div class="row2">
-        <div><label>Unit</label>
+        <div><label>Counting Unit <span style="font-weight:400; color:var(--ink-soft); font-size:11px;">(how you count stock — not the product size)</span></label>
           <select id="i-unit">${UNITS.map(u=>`<option value="${u}">${u}</option>`).join('')}</select>
         </div>
         <div><label>Supplier</label><input type="text" id="i-supplier" placeholder="Optional"></div>
