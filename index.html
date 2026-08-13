@@ -385,7 +385,7 @@ const CATEGORY_PREFIX = {
   "Produce":"PRD","Meat":"MEA","Household":"HHD","Toiletries":"TOI","Other":"GEN"
 };
 
-const APP_VERSION = "v18.3.1"; // bump this by hand with each future commit
+const APP_VERSION = "v18.4.1"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -452,7 +452,7 @@ let state = {
 };
 let view = "home";
 let loaded = false;
-
+let syncStatus = "unknown";
 let invSearch = "";
 let invCategoryFilter = "All";
 let invStorageFilter = "All";
