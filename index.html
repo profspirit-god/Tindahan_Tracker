@@ -385,7 +385,7 @@ const CATEGORY_PREFIX = {
   "Produce":"PRD","Meat":"MEA","Household":"HHD","Toiletries":"TOI","Other":"GEN"
 };
 
-const APP_VERSION = "v19.4.3"; // bump this by hand with each future commit
+const APP_VERSION = "v19.4.4"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -523,6 +523,15 @@ function goHistoryProtected(){
   }
   go('householdHistory');
 }
+function goStockHistoryProtected(){
+  const input = prompt("Enter the History passkey:");
+  if(input === null) return;
+  if(input !== HISTORY_PASSKEY){
+    alert("Wrong passkey.");
+    return;
+  }
+  go('stockHistory');
+}
 
 async function quickRefresh(){
   await loadState();
@@ -649,61 +658,47 @@ function downloadFile(filename, mime, content){
 
 function downloadWordSummary(){
   const now = new Date();
-  const sel = Window._selMonth || now.toISOString().slice(0,7);
+  const sel = window._selMonth || now.toISOString().slice(0,7);
   const [y, mo] = sel.split('-');
-  const monthLabel = `${MONTHS[parseInt(mo, 10)-1]} ${y}`;
-  const dRows = state.dailyLogs.filter(r=>monthKey(r.date)===sel);
-  const salesIn = dRows.reduce((s,r)=>s+(r.salesIn||0),0);
-  const purchOut = dRows.reduce((s,r)=>s+(r.purchOut||0),0);
-  const feeIn = dRows.reduce((s,r)=>s+(r.fee||0),0);
-  const opResult = salesIn + feeIn - purchOut;
-  const householdTotal = state.household.reduce((s,h)=>s+(Number(h.budget)||0),0);
-  const net = opResult - householdTotal;
+  const monthLabel = `${MONTHS[parseInt(mo,10)-1]} ${y}`;
+  const sum = getMonthSummary(sel);
   const unpaid = state.payables.filter(p=>p.status!=="Paid").sort((a,b)=>(a.due||"").localeCompare(b.due||""));
-  const unpaidTotal = unpaid.reduce((s,p)=>s+(p.amt||0),0);
+  const exp = getExpansionInsights(sel);
   const genDate = now.toLocaleDateString('en-PH', {year:'numeric', month:'long', day:'numeric'});
 
-  const style = `
-    body{font-family:Calibre, Arial, sans-serif; color:#222; font-size:14px;}
-    h1{font-size:22px; margin-bottom:2px;}
-    h2{font-size:16px; margin-top:26px; border-bottom:2px solid #16423C; padding-bottom:4px; color:#16423C;}
-    table{border-collapse:collapse; width:100%; margin-top:8px;}
-    td, th{border:1px solid #999; padding:6px 10px; font-size:13px; text-align:left;}
-    th{background:#EFE6CE}
-    .verdict{font-weight:bold; font-size:15px; padding:8px; border:2px solid ${net>=0?'#2E6B4F':'#8C3A32'}; color:${net>=0?'#2E6BaF':'#8C3A32'}; display:inline-block; margin-top;10px;}
-    .mute{color:#666; font-size:12px;}
-  `;
+  let out = "";
+  const line = (ch="=") => out += ch.repeat(44) + "\n";
+  const row = (label, val) => out += `${label.padEnd(30)} ${val}\n`;
 
-  let html = `<html><head><meta charset="utf-8"><style>${style}</style></head><body>`;
-  html += `<h1>Tindahan Tracker - Monthly Summary</h1>`;
-  html += `<div class="muted">Month: ${monthLabel} &nbsp; ·&nbsp; Generated: ${genDate}</div>`;
-  html += `<h2>Cash Summary</h2><table>
-    <tr><th>Item</th><th>Amount</th></tr>
-    <tr><td>Sales In</td><td>${peso(salesIn)}</td></tr>
-    <tr><td>Stock Purchases Out</td><td>${peso(purchOut)}</td></tr>
-    <tr><td>GCash Fees Earned</td><td>${peso(feeIn)}</td></tr>
-    <tr><td><b>Net After Household Draw</b></td><td><b>${peso(opResult)}</b></td></tr>
-    <tr><td>Household Budget (monthly)</td><td>${peso(householdTotal)}</td></tr>
-    <tr><td><b>Net After Household Draw</b></td><td><b>${peso(net)}</b></td></tr>
-  </table>`;
-  html += `<div class="verdict">${net>=0 ? "PTOFITABLE THIS MONTH" : "NEEDS ATTENTION"}</div>`;
-  html += `<h2>Household Budget Breakdown</h2><table>
-    <tr><th>Category</th><th>Budget</th><th>Actual</th></tr>
-    ${state.household.map(h=>`<tr><td>${escapeHtml(h.cat)}</td><td>${peso(h.budget)}</td><td>${peso(h.actual)}</td></tr>`).join('')}
-  </table>`;
-  html += `<h2>Outstanding Loans / Utang (${peso(unpaidTotal)} total)</h2>`;
-  html += unpaid.lenght===0 ? `<p>No outstanding loans.🎉</p>` : `<table>
-    <tr><th>Supplier / Lender</th><th>Item</th><th>Amount</th><th>Due Date</th></tr>
-    ${unpaid.map(p=>`<tr><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.item||'')}</td><td>${peso(p.amt)}</td><td>${p.due||'-'}</td></tr>`).join('')}
-  </table>`;
-  html += `<h2>Top Items Inventory Snapshot</h2>`;
-  html += state.inventory.lenght===0 ? `<p>No items listed yet.</p>` : `<table>
-    <tr><th>Item</th><th>Cost/Unit</th><th>Sell Price</th><th>Stock</th><th>Reorder At</th><th>Margin/Unit</th></tr>
-    ${state.inventory.map(r=>`<tr><td>${escapeHtml(r.name)}</td><td>${peso(r.cost)}</td><td>${peso(r.price)}</td><td>${r.stock}</td><td>${r.reorder}</td><td>${peso((r.price||0)-(r.cost||0))}</td></tr>`).join('')}
-  </table>`;
-  html += `</body></html>`;
+  out += "TINDAHAN TRACKER — MONTHLY SUMMARY\n";
+  out += `Month: ${monthLabel}    Generated: ${genDate}\n`;
+  line();
+  out += "\nCASH SUMMARY\n"; line("-");
+  row("Sales In", peso(sum.salesIn));
+  row("Stock Purchases Out", peso(sum.purchOut));
+  row("GCash Fees Earned", peso(sum.feeIn));
+  row("Store Operating Result", peso(sum.opResult));
+  row("Household Budget", peso(sum.householdTotal));
+  row("Net After Household Draw", peso(sum.net));
+  out += `\nVERDICT: ${sum.net>=0 ? "PROFITABLE THIS MONTH" : "NEEDS ATTENTION"}\n`;
 
-  downloadFile(`Tindahan_Summary_${sel}.doc`,`application/msword;charset=utf-8`, html);
+  out += "\nHOUSEHOLD BUDGET BREAKDOWN\n"; line("-");
+  state.household.forEach(h => row(h.cat, `Budget ${peso(h.budget)} / Actual ${peso(h.actual)}`));
+
+  out += `\nOUTSTANDING LOANS / UTANG (${peso(sum.unpaidTotal)} total)\n`; line("-");
+  if(unpaid.length===0) out += "No outstanding loans.\n";
+  else unpaid.forEach(p => row(`${p.name} (${p.item||''})`, `${peso(p.amt)} · due ${p.due||'—'}`));
+
+  out += `\nBUSINESS EXPANSION (STALL) — THIS MONTH\n`; line("-");
+  row("Total Spent", peso(exp.total));
+  if(exp.rows.length===0) out += "No entries this month.\n";
+  else exp.rows.forEach(r => row(`${r.date} ${r.item}`, peso(r.amt)));
+
+  out += "\nTOP ITEMS INVENTORY SNAPSHOT\n"; line("-");
+  if(state.inventory.length===0) out += "No items listed yet.\n";
+  else state.inventory.forEach(r => row(`${r.code} ${r.name}`, `Stock ${r.stock} ${r.unit} · Margin ${peso((r.price||0)-(r.cost||0))}`));
+
+  downloadFile(`Tindahan_Summary_${sel}.txt`, 'text/plain;charset=utf-8', out);
 }
 
 function renderDaily(){
@@ -1201,7 +1196,7 @@ function renderInventory(){
       </div>`;
     }).join('')}
 
-    <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="go('stockHistory')">📜 View Stock History</button>
+    <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="goStockHistoryProtected()">📜 View Stock History</button>
   </main>`;
 }
 
@@ -1298,13 +1293,13 @@ function logStockChange(itemName, action, qtyChange, oldStock, newStock){
 }
 
 function renderStockHistory(){
-  const rows = [...(state.stockHistory||[])].reverse();
+  const indexed = (state.stockHistory||[]).map((r,i)=>({...r, _idx:i})).reverse();
   return `
   ${header("Stock History","Kasaysayan ng Stock", true)}
   <main>
     <button class="btn" style="margin-bottom:14px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="go('inventory')">‹ Back to Top Items</button>
     <div class="card">
-      ${rows.length===0 ? `<div class="empty">Wala pang history.</div>` : rows.slice(0,150).map(r=>{
+      ${indexed.length===0 ? `<div class="empty">Wala pang history.</div>` : indexed.slice(0,150).map(r=>{
         const dt = new Date(r.time);
         const dtStr = dt.toLocaleString('en-PH', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
         return `<div class="entry">
@@ -1312,10 +1307,19 @@ function renderStockHistory(){
             <div><b>${escapeHtml(r.item)}</b> · ${r.action}</div>
             <div class="meta">${r.oldStock} → ${r.newStock} (${r.qtyChange>=0?'+':''}${r.qtyChange}) · by ${escapeHtml(r.by)} · ${dtStr}</div>
           </div>
+          <button class="del" onclick="delStockHistoryEntry(${r._idx})">✕</button>
         </div>`;
       }).join('')}
     </div>
   </main>`;
+}
+
+function delStockHistoryEntry(idx){
+  const ok = confirm("Tanggalin ang entry na ito sa history? Hindi ito maibabalik.\n\nDelete this history entry? This cannot be undone.");
+  if(!ok) return;
+  state.stockHistory.splice(idx, 1);
+  saveState();
+  render();
 }
 
 function daysUntil(dateStr){
