@@ -385,7 +385,7 @@ const CATEGORY_PREFIX = {
   "Produce":"PRD","Meat":"MEA","Household":"HHD","Toiletries":"TOI","Other":"GEN"
 };
 
-const APP_VERSION = "v18.1"; // bump this by hand with each future commit
+const APP_VERSION = "v18.2.1"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -565,30 +565,55 @@ function render(){
 
 
 function renderHome(){
+  const now = new Date();
+  const defaultMonth = now.toISOString().slice(0,7);
+  const sel = window._selMonth || defaultMonth;
+  const sum = getMonthSummary(sel);
+  const monthOptions = buildMonthOptions(sel);
+
+  const lowStockCount = state.inventory.filter(r=>Number(r.stock)<=Number(r.reorder)).length;
+  const expiringSoonCount = state.inventory.filter(r=>{
+    const d = daysUntil(r.expiryDate);
+    return d!==null && d<=7;
+  }).length;
+
   return `
-  ${header("Tindahan Tracker","Ang tatlong supot ng pera")}
+  ${header("Store Health","Kalusugan ng Tindahan")}
   <main>
-    <p class="subtitle">Tap a button below. Every family member sees the same records.</p>
-    <div class="grid-home">
-      <div class="tile" onclick="go('daily')"><div class="ic">🗓️</div><div class="en">Today's Entry</div><div class="fil">Ngayong Araw</div></div>
-      <div class="tile" onclick="go('gcash')"><div class="ic">📲</div><div class="en">GCash</div><div class="fil">Padala't Cash-in</div></div>
-      <div class="tile" onclick="go('payables')"><div class="ic">📒</div><div class="en">Utang / Loans</div><div class="fil">Utang sa Supplier</div></div>
-      <div class="tile" onclick="go('household')"><div class="ic">🏠</div><div class="en">Household Budget</div><div class="fil">Gastos sa Bahay</div></div>
-      <div class="tile" onclick="go('inventory')" style="position:relative;">
-        ${state.inventory.filter(r=>Number(r.stock)<=Number(r.reorder)).length>0 ? `<span class="pill overdue" style="position:absolute; top:8px; right:8px;">${state.inventory.filter(r=>Number(r.stock)<=Number(r.reorder)).length}</span>` : ''}
-        <div class="ic">📦</div><div class="en">Top Items</div><div class="fil">Mga Bentang Paninda</div>
-      </div>
-      <div class="tile" onclick="go('summary')"><div class="ic">📊</div><div class="en">Monthly Summary</div><div class="fil">Buod ng Buwan</div></div>
-      <div class="tile" onclick="go('insights')"><div class="ic">📈</div><div class="en">Insights</div><div class="fil">Mga Tsart at Ranggo</div></div>
+    <label>Select Month</label>
+    <select id="home-month" onchange="changeMonth(this.value)">${monthOptions}</select>
+
+    <div class="stamp ${sum.net>=0?'good':'bad'}" style="margin-top:16px;">${sum.net>=0 ? "PROFITABLE THIS MONTH" : "NEEDS ATTENTION"}</div>
+
+    <div class="card">
+      <div class="sumline"><span>Revenue (Gross Income)</span><b class="amt pos">${peso(sum.salesIn+sum.feeIn)}</b></div>
+      <div class="sumline"><span>Store Expenses</span><b class="amt neg">${peso(sum.purchOut)}</b></div>
+      <div class="sumline"><span>Profit (Net Operating)</span><b>${peso(sum.opResult)}</b></div>
+      <div class="sumline"><span>Household Budget</span><b class="amt neg">${peso(sum.householdTotal)}</b></div>
+      <div class="sumline"><span>Net After Household Draw</span><b class="${sum.net>=0?'amt pos':'amt neg'}">${peso(sum.net)}</b></div>
     </div>
-    <div class="tile" style="margin-top:14px; grid-column:1/-1;" onclick="go('help')">
-      <div class="ic">💡</div><div class="en">Help &amp; Tips</div><div class="fil">Gabay at mga Tip</div>
+
+    <div class="section-title">Needs Your Attention</div>
+    <div class="tile" style="width:100%; margin-bottom:10px; flex-direction:row; justify-content:space-between; text-align:left; min-height:auto; padding:16px;" onclick="go('inventory')">
+      <span>📦 Low Stock Items</span>
+      <b class="${lowStockCount>0?'amt neg':'amt pos'}">${lowStockCount}</b>
     </div>
+    <div class="tile" style="width:100%; margin-bottom:10px; flex-direction:row; justify-content:space-between; text-align:left; min-height:auto; padding:16px;" onclick="go('inventory')">
+      <span>⏳ Expiring Soon</span>
+      <b class="${expiringSoonCount>0?'amt neg':'amt pos'}">${expiringSoonCount}</b>
+    </div>
+    <div class="tile" style="width:100%; margin-bottom:18px; flex-direction:row; justify-content:space-between; text-align:left; min-height:auto; padding:16px;" onclick="go('payables')">
+      <span>📒 Unpaid Loans</span>
+      <b class="amt neg">${peso(sum.unpaidTotal)}</b>
+    </div>
+
+    <button class="btn" style="width:100%; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="refreshFromServer()">🔄 Refresh shared data / Kunin ang bagong data</button>
+    <div id="last-sync" style="text-align:center; font-size:12px; color:var(--ink-soft); margin-top:8px;">${syncStatus==="ok" ? "Last synced OK ✓" : syncStatus==="error" ? "Not synced yet ⚠️" : ""}</div>
 
     <div class="section-title" style="margin-top:22px;">Data Tools</div>
-    <button class="btn" style="width:100%; background:var(--brass); color:#fff;" onclick="downloadWordSummary()">⬇ Download Summary</button>
+    <button class="btn" style="width:100%; background:var(--brass); color:#fff;" onclick="downloadWordSummary()">⬇ Download Summary (Word)</button>
     <button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--bad); color:var(--bad);" onclick="resetData()">🗑 Reset for a Clean Slate</button>
-
+    <p class="subtitle" style="margin-top:6px;">Reset clears Today's Entries, GCash, Loans, and household spending totals only. Top Items is always kept.</p>
   </main>`;
 }
 
