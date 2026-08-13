@@ -222,6 +222,19 @@
 .sb-divider{ height:1px; background:rgba(255,255,255,.12); margin:10px 0; }
 .sb-version{ margin-top:auto; padding-top:14px; font-size:11px; color:rgba(255,255,255,.5); text-align:center; }
 
+#item-modal-overlay{
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:996;
+  align-items:flex-end; justify-content:center;
+}
+#item-modal-overlay.open{ display:flex; }
+#item-modal-sheet{
+  background:var(--page); width:100%; max-width:520px; max-height:88vh; overflow-y:auto;
+  border-radius:20px 20px 0 0; padding:20px 20px 28px;
+}
+.modal-title-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+.modal-title-row h3{ font-family:'Zilla Slab',serif; margin:0; color:var(--cover-dark); font-size:19px; }
+.modal-x{ background:var(--page-line); border:none; width:34px; height:34px; border-radius:10px; font-size:16px; color:var(--ink); }
+
 </style>
 </head>
 <body>
@@ -247,6 +260,10 @@
     <button class="modal-close" onclick="closeChartModal()">✕</button>
   </div>
   <div class="modal-body"><canvas id="modalCanvas"></canvas></div>
+</div>
+
+<div id="item-modal-overlay" onclick="if(event.target===this) closeItemModal()">
+  <div id="item-modal-sheet"></div>
 </div>
 
 <div id="username-screen">
@@ -372,7 +389,7 @@ const CATEGORY_PREFIX = {
   "Produce":"PRD","Meat":"MEA","Household":"HHD","Toiletries":"TOI","Other":"GEN"
 };
 
-const APP_VERSION = "v19.5.6"; // bump this by hand with each future commit
+const APP_VERSION = "v20.5.6"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -380,7 +397,7 @@ const NAV_ITEMS = [
   {view:'household', ic:'💵', label:'Household Budget'},
   {view:'payables', ic:'📒', label:'Utang / Loans'},
   {view:'expansion', ic:'🔨', label:'Expansion (Stall)'},
-  {view:'inventory', ic:'📦', label:'Top Items'},
+  {view:'inventory', ic:'📦', label:'Inventory'},
   {view:'insights', ic:'📈', label:'Insights'},
   {view:'help', ic:'💡', label:'Help & Tips'},
 ];
@@ -446,6 +463,7 @@ let invSearch = "";
 let invCategoryFilter = "All";
 let invStorageFilter = "All";
 let expandedItemIdx = -1;
+let itemModalEditIndex = null; // null = adding new, otherwise index of item being edited
 
 function peso(n){
   n = Number(n)||0;
@@ -1078,9 +1096,25 @@ function renderInventory(){
       return true;
     });
 
+  const val = getInventoryValue();
+  const soon = state.inventory.filter(r => daysUntil(r.expiryDate)!==null && daysUntil(r.expiryDate)<=7);
+
   return `
-  ${header("Top Items","Mga bentang paninda na kailangang bantayan", true)}
+  ${header("Inventory","Listahan ng mga Paninda")}
   <main>
+    <div class="card">
+      <div class="sumline"><span>Total Stock Value (at cost)</span><b>${peso(val.costValue)}</b></div>
+      <div class="sumline"><span>Total Potential Sale Value</span><b>${peso(val.saleValue)}</b></div>
+      <div class="sumline"><span>Potential Margin if All Sold</span><b class="amt pos">${peso(val.saleValue - val.costValue)}</b></div>
+    </div>
+
+    ${soon.length>0 ? `<div class="card" style="border:1.5px solid #7A4E00; background:#FCF3DF;">
+      <b style="color:#7A4E00;">⚠️ Expiring within 7 days (${soon.length})</b>
+      ${soon.sort((a,b)=>daysUntil(a.expiryDate)-daysUntil(b.expiryDate)).map(r=>
+        `<div class="sumline"><span>${escapeHtml(r.name)}</span><b>${daysUntil(r.expiryDate)<0?'EXPIRED':daysUntil(r.expiryDate)+'d left'}</b></div>`
+      ).join('')}
+    </div>` : ''}
+
     <div class="search-row">
       <input type="text" placeholder="🔍 Search name or code…" value="${escapeHtml(invSearch)}" oninput="setInvSearch(this.value)">
     </div>
@@ -1095,63 +1129,18 @@ function renderInventory(){
       </select>
     </div>
 
-    <div class="card">
-      <label>Item Name</label>
-      <input type="text" id="i-name" placeholder="e.g. Bottled water 500ml">
-      <div class="row2">
-        <div><label>Category</label>
-          <select id="i-category">${CATEGORIES.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>
-        </div>
-        <div><label>Storage Type</label>
-          <select id="i-storage">${STORAGE_TYPES.map(s=>`<option value="${s}">${s}</option>`).join('')}</select>
-        </div>
-      </div>
-      <div class="row2">
-        <div><label>Counting Unit <span style="font-weight:400; color:var(--ink-soft); font-size:11px;">(how you count stock — not the product size)</span></label>
-          <select id="i-unit">${UNITS.map(u=>`<option value="${u}">${u}</option>`).join('')}</select>
-        </div>
-        <div><label>Supplier</label><input type="text" id="i-supplier" placeholder="Optional"></div>
-      </div>
-      <div class="row2">
-        <div><label>Cost / Unit (₱)</label><input type="number" id="i-cost" placeholder="0"></div>
-        <div><label>Sell Price (₱)</label><input type="number" id="i-price" placeholder="0"></div>
-      </div>
-      <div class="row2">
-        <div><label>Current Stock</label><input type="number" id="i-stock" placeholder="0"></div>
-        <div><label>Reorder Point</label><input type="number" id="i-reorder" placeholder="0"></div>
-      </div>
-      <label>Expiry Date <span style="font-weight:400; color:var(--ink-soft);">(optional — Frozen/Perishable)</span></label>
-      <input type="date" id="i-expiry">
-      <button class="btn btn-primary" onclick="addInventory()">Save Item</button>
-    </div>
+    <button class="btn btn-primary" style="margin-bottom:6px;" onclick="openItemModal()">+ Add New Item</button>
 
-    ${(() => {
-      const val = getInventoryValue();
-      return `<div class="card">
-        <div class="sumline"><span>Total Stock Value (at cost)</span><b>${peso(val.costValue)}</b></div>
-        <div class="sumline"><span>Total Potential Sale Value</span><b>${peso(val.saleValue)}</b></div>
-        <div class="sumline"><span>Potential Margin if All Sold</span><b class="amt pos">${peso(val.saleValue - val.costValue)}</b></div>
-      </div>`;
-    })()}
-    ${(() => {
-      const soon = state.inventory.filter(r => daysUntil(r.expiryDate)!==null && daysUntil(r.expiryDate)<=7);
-      if(soon.length===0) return '';
-      return `<div class="card" style="border:1.5px solid #7A4E00; background:#FCF3DF;">
-        <b style="color:#7A4E00;">⚠️ Expiring within 7 days (${soon.length})</b>
-        ${soon.sort((a,b)=>daysUntil(a.expiryDate)-daysUntil(b.expiryDate)).map(r=>
-          `<div class="sumline"><span>${escapeHtml(r.name)}</span><b>${daysUntil(r.expiryDate)<0?'EXPIRED':daysUntil(r.expiryDate)+'d left'}</b></div>`
-        ).join('')}
-      </div>`;
-    })()}
     <div class="section-title">Item List (${rows.length})</div>
     ${rows.length===0 ? `<div class="card"><div class="empty">Walang item na tugma.</div></div>` : rows.map(r=>{
       const low = Number(r.stock) <= Number(r.reorder);
       const margin = (Number(r.price)||0) - (Number(r.cost)||0);
       const isOpen = expandedItemIdx === r._idx;
+      const dLeft = daysUntil(r.expiryDate);
       return `<div class="item-row">
         <div class="item-row-head" onclick="toggleExpand(${r._idx})">
           <div>
-            <b>${escapeHtml(r.name)}</b><span class="code-badge">${r.code}</span> ${low?`<span class="pill overdue">LOW</span>`:''} ${(daysUntil(r.expiryDate)!==null && daysUntil(r.expiryDate)<=7) ? `<span class="pill overdue" style="background:#F4D9A0; color:#7A4E00;">${daysUntil(r.expiryDate)<0?'EXPIRED':'EXPIRING SOON'}</span>` : ''}
+            <b>${escapeHtml(r.name)}</b><span class="code-badge">${r.code}</span> ${low?`<span class="pill overdue">LOW</span>`:''} ${(dLeft!==null && dLeft<=7) ? `<span class="pill overdue" style="background:#F4D9A0; color:#7A4E00;">${dLeft<0?'EXPIRED':'EXPIRING'}</span>` : ''}
             <div class="meta">Stock: ${r.stock} ${r.unit} · ${r.category}</div>
           </div>
           <span class="chevron ${isOpen?'open':''}">▶</span>
@@ -1168,14 +1157,15 @@ function renderInventory(){
             const rate = getDailySellRate(r.name);
             if(rate <= 0) return 'Not enough sales data yet';
             const days = Math.round((Number(r.stock)||0) / rate);
-            return `~${days} day${days===1?'':'s'} (based on last 14 days)`;
+            return `~${days} day${days===1?'':'s'}`;
           })()}</b></div>
           <div style="display:flex; gap:8px; margin-top:10px;">
             <button class="btn" style="flex:1; background:var(--teal); color:#fff; padding:9px; font-size:13px;" onclick="restockItem(${r._idx})">+ Restock</button>
             <button class="btn" style="flex:1; background:var(--bad); color:#fff; padding:9px; font-size:13px;" onclick="sellItem(${r._idx})">− Sold</button>
           </div>
           <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid #7A4E00; color:#7A4E00; padding:9px; font-size:13px;" onclick="spoilItem(${r._idx})">🗑 Spoiled / Wasted</button>
-          <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--bad); color:var(--bad); padding:8px; font-size:13px;" onclick="delItem('inventory', ${r._idx})">Delete Item</button>
+          <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--brass); color:var(--brass); padding:9px; font-size:13px;" onclick="openItemModal(${r._idx})">✏️ Edit Item</button>
+          <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--bad); color:var(--bad); padding:9px; font-size:13px;" onclick="delItem('inventory', ${r._idx})">Delete Item</button>
         </div>` : ''}
       </div>`;
     }).join('')}
@@ -1188,26 +1178,6 @@ function setInvSearch(v){ invSearch = v; render(); }
 function setInvCategoryFilter(v){ invCategoryFilter = v; render(); }
 function setInvStorageFilter(v){ invStorageFilter = v; render(); }
 function toggleExpand(i){ expandedItemIdx = (expandedItemIdx===i) ? -1 : i; render(); }
-
-function addInventory(){
-  const name = document.getElementById('i-name').value.trim();
-  if(!name) return;
-  const category = document.getElementById('i-category').value;
-  const code = generateProductCode(category);
-  state.inventory.push({
-    code, name, category,
-    storageType: document.getElementById('i-storage').value,
-    unit: document.getElementById('i-unit').value,
-    supplier: document.getElementById('i-supplier').value.trim(),
-    cost: parseFloat(document.getElementById('i-cost').value)||0,
-    price: parseFloat(document.getElementById('i-price').value)||0,
-    stock: parseFloat(document.getElementById('i-stock').value)||0,
-    reorder: parseFloat(document.getElementById('i-reorder').value)||0,
-    expiryDate: document.getElementById('i-expiry').value || ""
-  });
-  saveState();
-  render();
-}
 
 function restockItem(i){
   const input = prompt(`Ilan ang idadagdag sa stock ng ${state.inventory[i].name}?\n\nHow many units to add to ${state.inventory[i].name}?`);
@@ -1281,7 +1251,7 @@ function renderStockHistory(){
   return `
   ${header("Stock History","Kasaysayan ng Stock", true)}
   <main>
-    <button class="btn" style="margin-bottom:14px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="go('inventory')">‹ Back to Top Items</button>
+    <button class="btn" style="margin-bottom:14px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="go('inventory')">‹ Back to Inventory</button>
     <div class="card">
       ${indexed.length===0 ? `<div class="empty">Wala pang history.</div>` : indexed.slice(0,150).map(r=>{
         const dt = new Date(r.time);
@@ -1303,6 +1273,82 @@ function delStockHistoryEntry(idx){
   if(!ok) return;
   state.stockHistory.splice(idx, 1);
   saveState();
+  render();
+}
+
+function selectOptions(list, selected){
+  return list.map(v=>`<option value="${v}" ${v===selected?'selected':''}>${v}</option>`).join('');
+}
+
+function openItemModal(editIndex){
+  itemModalEditIndex = (editIndex===undefined) ? null : editIndex;
+  const item = itemModalEditIndex!==null ? state.inventory[itemModalEditIndex] : null;
+  const sheet = document.getElementById('item-modal-sheet');
+  sheet.innerHTML = `
+    <div class="modal-title-row">
+      <h3>${item ? 'Edit Item' : 'Add New Item'}</h3>
+      <button class="modal-x" onclick="closeItemModal()">✕</button>
+    </div>
+    <label>Item Name</label>
+    <input type="text" id="im-name" placeholder="e.g. Bottled water 250mL" value="${item?escapeHtml(item.name):''}">
+    <div class="row2">
+      <div><label>Category</label>
+        <select id="im-category">${selectOptions(CATEGORIES, item?item.category:CATEGORIES[0])}</select>
+      </div>
+      <div><label>Storage Type</label>
+        <select id="im-storage">${selectOptions(STORAGE_TYPES, item?item.storageType:STORAGE_TYPES[0])}</select>
+      </div>
+    </div>
+    <div class="row2">
+      <div><label>Counting Unit <span style="font-weight:400; color:var(--ink-soft); font-size:11px;">(how you count stock)</span></label>
+        <select id="im-unit">${selectOptions(UNITS, item?item.unit:UNITS[0])}</select>
+      </div>
+      <div><label>Supplier</label><input type="text" id="im-supplier" placeholder="Optional" value="${item?escapeHtml(item.supplier||''):''}"></div>
+    </div>
+    <div class="row2">
+      <div><label>Cost / Unit (₱)</label><input type="number" id="im-cost" placeholder="0" value="${item?item.cost:''}"></div>
+      <div><label>Sell Price (₱)</label><input type="number" id="im-price" placeholder="0" value="${item?item.price:''}"></div>
+    </div>
+    <div class="row2">
+      <div><label>Current Stock</label><input type="number" id="im-stock" placeholder="0" value="${item?item.stock:''}"></div>
+      <div><label>Reorder Point</label><input type="number" id="im-reorder" placeholder="0" value="${item?item.reorder:''}"></div>
+    </div>
+    <label>Expiry Date <span style="font-weight:400; color:var(--ink-soft); font-size:11px;">(optional)</span></label>
+    <input type="date" id="im-expiry" value="${item?(item.expiryDate||''):''}">
+    <button class="btn btn-primary" onclick="saveItemForm()">${item ? 'Save Changes' : 'Save Item'}</button>
+  `;
+  document.getElementById('item-modal-overlay').classList.add('open');
+}
+
+function closeItemModal(){
+  document.getElementById('item-modal-overlay').classList.remove('open');
+  itemModalEditIndex = null;
+}
+
+function saveItemForm(){
+  const name = document.getElementById('im-name').value.trim();
+  if(!name){ alert('Item name is required.'); return; }
+  const category = document.getElementById('im-category').value;
+  const data = {
+    name, category,
+    storageType: document.getElementById('im-storage').value,
+    unit: document.getElementById('im-unit').value,
+    supplier: document.getElementById('im-supplier').value.trim(),
+    cost: parseFloat(document.getElementById('im-cost').value)||0,
+    price: parseFloat(document.getElementById('im-price').value)||0,
+    stock: parseFloat(document.getElementById('im-stock').value)||0,
+    reorder: parseFloat(document.getElementById('im-reorder').value)||0,
+    expiryDate: document.getElementById('im-expiry').value || ""
+  };
+  if(itemModalEditIndex === null){
+    data.code = generateProductCode(category);
+    state.inventory.push(data);
+  } else {
+    data.code = state.inventory[itemModalEditIndex].code; // keep the original code even if category changes
+    state.inventory[itemModalEditIndex] = data;
+  }
+  saveState();
+  closeItemModal();
   render();
 }
 
@@ -1642,7 +1688,7 @@ function renderHelp(){
     <p class="help-p"><b>📲 GCash</b> — para lang sa cash-in/cash-out ng customer, hindi sa pambayad sa supplier.</p>
     <p class="help-p"><b>💵 Household Budget</b> — '+ Add' kapag may bagong gastos, '− Fix' kung mali ang nailagay, ✕ para tanggalin ang kategorya. May History button na protektado ng sariling passkey.</p>
     <p class="help-p"><b>📒 Utang / Loans</b> — bawat may utang na supplier o pautang, ilista dito para may paalala ang due date.</p>
-    <p class="help-p"><b>📦 Top Items</b> — hanapin gamit ang search o i-filter ayon sa Category/Storage Type. I-tap ang isang item para makita ang detalye at ma-restock, mabenta, o maireport na sira. May babala din kung malapit nang mag-expire.</p>
+    <p class="help-p"><b>📦 Inventory</b> — hanapin gamit ang search o i-filter ayon sa Category/Storage Type. I-tap ang isang item para makita ang detalye at ma-restock, mabenta, o maireport na sira. May babala din kung malapit nang mag-expire.</p>
     <p class="help-p"><b>📈 Insights</b> — mga tsart ng Revenue/Expenses/Profit at gastos sa bahay, plus ranggo ng araw at kategorya mula pinakamataas hanggang pinakamababa.</p>
 
     <div class="help-h">Data Tools (nasa Store Health)</div>
