@@ -385,7 +385,7 @@ const CATEGORY_PREFIX = {
   "Produce":"PRD","Meat":"MEA","Household":"HHD","Toiletries":"TOI","Other":"GEN"
 };
 
-const APP_VERSION = "v18.2.1"; // bump this by hand with each future commit
+const APP_VERSION = "v18.3.1"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -1256,6 +1256,18 @@ function daysUntil(dateStr){
   return Math.round((target - today) / 86400000);
 }
 
+function getMonthSummary(sel){
+  const dRows = state.dailyLogs.filter(r=>monthKey(r.date)===sel);
+  const salesIn = dRows.reduce((s,r)=>s+(r.salesIn||0),0);
+  const purchOut = dRows.reduce((s,r)=>s+(r.purchOut||0),0);
+  const feeIn = dRows.reduce((s,r)=>s+(r.fee||0),0);
+  const movedOut = dRows.reduce((s,r)=>s+(r.movedDraw||0),0);
+  const opResult = salesIn + feeIn - purchOut;
+  const householdTotal = state.household.reduce((s,h)=>s+(Number(h.budget)||0),0);
+  const net = opResult - householdTotal;
+  const unpaidTotal = state.payables.filter(p=>p.status!=="Paid").reduce((s,p)=>s+(p.amt||0),0);
+  return {salesIn, purchOut, feeIn, movedOut, opResult, householdTotal, net, unpaidTotal};
+}
 
 function renderSummary(){
   const now = new Date();
