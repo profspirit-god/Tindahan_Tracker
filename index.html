@@ -244,7 +244,7 @@
   <button id="lock-btn" onclick="checkPin()">Unlock</button>
 </div>
 <body>
-<div id="sync-banner" style="display:none; ..."></div>
+<div id="sync-banner" style="display:none; position:sticky; top:0; z-index:10; font-size:12.5px; padding:8px 14px; border-bottom:2px solid; text-align:center;"></div>
 <button id="hamburger-btn" onclick="toggleSidebar()">☰</button>
 <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
 <div id="sidebar"></div>
@@ -385,7 +385,7 @@ const CATEGORY_PREFIX = {
   "Produce":"PRD","Meat":"MEA","Household":"HHD","Toiletries":"TOI","Other":"GEN"
 };
 
-const APP_VERSION = "v18"; // bump this by hand with each future commit
+const APP_VERSION = "v18.1"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
