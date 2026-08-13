@@ -385,13 +385,14 @@ const CATEGORY_PREFIX = {
   "Produce":"PRD","Meat":"MEA","Household":"HHD","Toiletries":"TOI","Other":"GEN"
 };
 
-const APP_VERSION = "v18.4.3"; // bump this by hand with each future commit
+const APP_VERSION = "v19.4.3"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
   {view:'gcash', ic:'📲', label:'GCash'},
   {view:'household', ic:'💵', label:'Household Budget'},
   {view:'payables', ic:'📒', label:'Utang / Loans'},
+  {view:'expansion', ic:'🔨', label:'Expansion (Stall)'},
   {view:'inventory', ic:'📦', label:'Top Items'},
   {view:'insights', ic:'📈', label:'Insights'},
   {view:'help', ic:'💡', label:'Help & Tips'},
@@ -449,6 +450,7 @@ let state = {
   inventory: [],
   householdHistory: [],
   stockHistory: [],
+  expansionLog: []
 };
 let view = "home";
 let loaded = false;
@@ -558,6 +560,7 @@ function render(){
   else if(view==="help") html = renderHelp();
   else if(view==="insights") html = renderInsights();
   else if(view==="stockHistory") html = renderStockHistory();
+  else if(view==="expansion") html = renderExpansion();
   app.innerHTML = html;
   attachHandlers();
   renderSidebar();
@@ -872,6 +875,68 @@ function markPaid(idx){
   const ok = confirm("Sigurado ka ba? Markahan itong bayad na. \n\nAre you sure? This will mark it as paid.");
   if(!ok) return;
   state.payables[idx].status = "Paid";
+  saveState();
+  render();
+}
+
+function renderExpansion(){
+  const rows = [...(state.expansionLog||[])].sort((a,b)=>b.date.localeCompare(a.date));
+  const allTimeTotal = (state.expansionLog||[]).reduce((s,r)=>s+(r.amt||0),0);
+  const now = new Date();
+  const thisMonth = now.toISOString().slice(0,7);
+  const monthTotal = (state.expansionLog||[]).filter(r=>monthKey(r.date)===thisMonth).reduce((s,r)=>s+(r.amt||0),0);
+
+  return `
+  ${header("Expansion (Stall)","Gastos sa Pagpapalawak — Ihaw-Ihaw Stall", true)}
+  <main>
+    <div class="banner">This is a separate pot from Store Cash — the stall build is a different project, so it never affects your Store Health numbers.</div>
+
+    <div class="card">
+      <div class="sumline"><span>This Month</span><b class="amt neg">${peso(monthTotal)}</b></div>
+      <div class="sumline"><span>All-Time Total</span><b class="amt neg">${peso(allTimeTotal)}</b></div>
+    </div>
+
+    <div class="card">
+      <label>Date</label>
+      <input type="date" id="e-date" value="${todayStr()}">
+      <label>Item / Material</label>
+      <input type="text" id="e-item" placeholder="e.g. Welding rods, plywood">
+      <label>Amount (₱)</label>
+      <input type="number" id="e-amt" placeholder="0" inputmode="decimal">
+      <label>Notes</label>
+      <input type="text" id="e-notes" placeholder="Optional">
+      <button class="btn btn-primary" onclick="addExpansion()">Save Entry</button>
+    </div>
+
+    <div class="section-title">All Entries</div>
+    <div class="card">
+      ${rows.length===0 ? `<div class="empty">Wala pang entry.</div>` : rows.map(r=>{
+        const idx = state.expansionLog.indexOf(r);
+        return `<div class="entry">
+          <div>
+            <div><b>${r.date}</b> · ${escapeHtml(r.item)}</div>
+            <div class="meta">${escapeHtml(r.notes||'')} ${r.by?`· by ${escapeHtml(r.by)}`:''}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="amt neg">${peso(r.amt)}</div>
+            <button class="del" onclick="delItem('expansionLog', ${idx})">✕</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </main>`;
+}
+
+function addExpansion(){
+  const item = document.getElementById('e-item').value.trim();
+  if(!item) return;
+  const date = document.getElementById('e-date').value || todayStr();
+  state.expansionLog.push({
+    date, item,
+    amt: parseFloat(document.getElementById('e-amt').value)||0,
+    notes: document.getElementById('e-notes').value.trim(),
+    by: currentUser || 'Unknown'
+  });
   saveState();
   render();
 }
@@ -1273,6 +1338,14 @@ function getMonthSummary(sel){
   return {salesIn, purchOut, feeIn, movedOut, opResult, householdTotal, net, unpaidTotal};
 }
 
+function getExpansionInsights(sel){
+  const rows = (state.expansionLog||[]).filter(r=>monthKey(r.date)===sel).sort((a,b)=>a.date.localeCompare(b.date));
+  let running = 0;
+  const cumulative = rows.map(r=>{ running += r.amt; return {date:r.date, cumulative:running}; });
+  const total = rows.reduce((s,r)=>s+(r.amt||0),0);
+  return {rows, cumulative, total};
+}
+
 function renderSummary(){
   const now = new Date();
   const defaultMonth = now.toISOString().slice(0,7);
@@ -1333,6 +1406,7 @@ function getHouseholdByCategory(sel){
 }
 let incomeExpenseChart = null;
 let householdPieChart = null;
+let expansionChart = null;
 let rankMetric = "income";
 let rankOrder = "desc";
 let hhRankOrder = "desc";
@@ -1389,6 +1463,15 @@ function renderInsights(){
       </div>
       <div style="margin-top:10px;">${renderHouseholdRanking(household)}</div>
     </div>
+
+    <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
+      Business Expansion (Stall) Spending
+      <button class="btn" style="background:var(--teal); color:#fff; padding:6px 12px; font-size:12px;" onclick="expandChart('expansion')">⤢ Expand</button>
+    </div>
+    <div class="card">
+      <div class="sumline"><span>Total This Month</span><b class="amt neg">${peso(getExpansionInsights(sel).total)}</b></div>
+      <canvas id="expansionCanvas" height="180" style="margin-top:10px;"></canvas>
+    </div>
   </main>`;
 }
 
@@ -1417,6 +1500,7 @@ function renderHouseholdRanking(household){
 function destroyInsightCharts(){
   if(incomeExpenseChart){ incomeExpenseChart.destroy(); incomeExpenseChart = null; }
   if(householdPieChart){ householdPieChart.destroy(); householdPieChart = null; }
+  if(expansionChart){ expansionChart.destroy(); expansionChart = null; }
 }
 
 function drawInsightCharts(sel){
@@ -1453,6 +1537,21 @@ function drawInsightCharts(sel){
       options: { responsive:true, plugins:{legend:{position:'bottom'}} }
     });
   }
+
+  const expCanvas = document.getElementById('expansionCanvas');
+  if(expCanvas){
+    const exp = getExpansionInsights(sel);
+    if(exp.cumulative.length > 0){
+      expansionChart = new Chart(expCanvas, {
+        type: 'line',
+        data: {
+          labels: exp.cumulative.map(d=>d.date.slice(8,10)),
+          datasets: [{label:'Cumulative Stall Spending', data: exp.cumulative.map(d=>d.cumulative), borderColor:'#A9762F', backgroundColor:'#A9762F', tension:0.2, fill:true}]
+        },
+        options: { responsive:true, plugins:{legend:{position:'bottom'}} }
+      });
+    }
+  }
 }
 
 let modalChart = null;
@@ -1479,7 +1578,7 @@ function expandChart(type){
         ]},
       options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:14}}}} }
     });
-  } else {
+  } else if(type === 'household'){
     title.textContent = 'Household Spending by Category';
     const household = getHouseholdByCategory(sel);
     modalChart = new Chart(document.getElementById('modalCanvas'), {
@@ -1487,6 +1586,15 @@ function expandChart(type){
       data:{ labels: household.map(h=>h.cat),
         datasets:[{ data: household.map(h=>h.total),
           backgroundColor:['#A9762F','#2C6E7F','#8C3A32','#2E6B4F','#D9A55C','#16423C','#6B6255','#C98A2C'] }]},
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:14}}}} }
+    });
+  } else if(type === 'expansion'){
+    title.textContent = 'Business Expansion (Stall) Spending — Cumulative';
+    const exp = getExpansionInsights(sel);
+    modalChart = new Chart(document.getElementById('modalCanvas'), {
+      type:'line',
+      data:{ labels: exp.cumulative.map(d=>d.date.slice(8,10)),
+        datasets:[{label:'Cumulative Stall Spending', data: exp.cumulative.map(d=>d.cumulative), borderColor:'#A9762F', backgroundColor:'#A9762F', tension:0.2, fill:true}]},
       options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:14}}}} }
     });
   }
