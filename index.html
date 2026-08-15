@@ -395,7 +395,7 @@ const CATEGORY_PREFIX = {
   "Produce":"PRD","Meat":"MEA","Household":"HHD","Toiletries":"TOI","Other":"GEN"
 };
 
-const APP_VERSION = "v22.0.0"; // bump this by hand with each future commit
+const APP_VERSION = "v22.1.0"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -1128,7 +1128,7 @@ function renderInventory(){
     </div>` : ''}
 
     <div class="search-row">
-      <input type="text" placeholder="🔍 Search name or code…" value="${escapeHtml(invSearch)}" oninput="setInvSearch(this.value)">
+      <input type="text" id="inv-search-input" placeholder="🔍 Search name or code…" value="${escapeHtml(invSearch)}" oninput="setInvSearch(this.value)">
     </div>
     <div class="filter-row">
       <select onchange="setInvCategoryFilter(this.value)">
@@ -1201,7 +1201,12 @@ function renderInventory(){
   </main>`;
 }
 
-function setInvSearch(v){ invSearch = v; render(); }
+function setInvSearch(v){
+  invSearch = v;
+  render();
+  const inp = document.getElementById('inv-search-input');
+  if(inp){ inp.focus(); inp.setSelectionRange(v.length, v.length); }
+}
 function setInvCategoryFilter(v){ invCategoryFilter = v; render(); }
 function setInvStorageFilter(v){ invStorageFilter = v; render(); }
 function toggleExpand(i){ expandedItemIdx = (expandedItemIdx===i) ? -1 : i; render(); }
