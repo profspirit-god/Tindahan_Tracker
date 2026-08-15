@@ -395,7 +395,7 @@ const CATEGORY_PREFIX = {
   "Produce":"PRD","Meat":"MEA","Household":"HHD","Toiletries":"TOI","Other":"GEN"
 };
 
-const APP_VERSION = "v21.5.6"; // bump this by hand with each future commit
+const APP_VERSION = "v21.5.7"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -471,6 +471,9 @@ let invCategoryFilter = "All";
 let invStorageFilter = "All";
 let expandedItemIdx = -1;
 let itemModalEditIndex = null; // null = adding new, otherwise index of item being edited
+let invPageSize = "20";
+let invLowStockOnly = false;
+let stockHistPageSize = "20";
 
 function peso(n){
   n = Number(n)||0;
@@ -1096,6 +1099,7 @@ function renderInventory(){
     .filter(r=>{
       if(invCategoryFilter!=="All" && r.category!==invCategoryFilter) return false;
       if(invStorageFilter!=="All" && r.storageType!==invStorageFilter) return false;
+      if(invLowStockOnly && !(Number(r.stock)<=Number(r.reorder))) return false;
       if(invSearch.trim()){
         const q = invSearch.toLowerCase();
         if(!r.name.toLowerCase().includes(q) && !(r.code||"").toLowerCase().includes(q)) return false;
@@ -1135,11 +1139,23 @@ function renderInventory(){
         ${STORAGE_TYPES.map(s=>`<option value="${s}" ${invStorageFilter===s?'selected':''}>${s}</option>`).join('')}
       </select>
     </div>
+    <div class="filter-row">
+      <label style="display:flex; align-items:center; gap:6px; font-size:13px; flex:1;">
+        <input type="checkbox" ${invLowStockOnly?'checked':''} onchange="setInvLowStockOnly(this.checked)" style="width:auto;"> Low stock only
+      </label>
+      <select onchange="setInvPageSize(this.value)" style="flex:1;">
+        <option value="10" ${invPageSize==='10'?'selected':''}>Show 10</option>
+        <option value="20" ${invPageSize==='20'?'selected':''}>Show 20</option>
+        <option value="30" ${invPageSize==='30'?'selected':''}>Show 30</option>
+        <option value="All" ${invPageSize==='All'?'selected':''}>Show All</option>
+      </select>
+    </div>
 
     <button class="btn btn-primary" style="margin-bottom:6px;" onclick="openItemModal()">+ Add New Item</button>
-
-    <div class="section-title">Item List (${rows.length})</div>
-    ${rows.length===0 ? `<div class="card"><div class="empty">Walang item na tugma.</div></div>` : rows.map(r=>{
+    
+    <div class="section-title">Item List (${displayRows.length} of ${rows.length})</div>
+    const displayRows = invPageSize==='All' ? rows : rows.slice(0, parseInt(invPageSize,10));
+    ${displayRows.length===0 ? `<div class="card"><div class="empty">Walang item na tugma.</div></div>` : displayRows.map(r=>{
       const low = Number(r.stock) <= Number(r.reorder);
       const margin = (Number(r.price)||0) - (Number(r.cost)||0);
       const isOpen = expandedItemIdx === r._idx;
@@ -1189,6 +1205,8 @@ function setInvSearch(v){ invSearch = v; render(); }
 function setInvCategoryFilter(v){ invCategoryFilter = v; render(); }
 function setInvStorageFilter(v){ invStorageFilter = v; render(); }
 function toggleExpand(i){ expandedItemIdx = (expandedItemIdx===i) ? -1 : i; render(); }
+function setInvLowStockOnly(v){ invLowStockOnly = v; render(); }
+function setInvPageSize(v){ invPageSize = v; render(); }
 
 function restockItem(i){
   const item = state.inventory[i];
@@ -1360,12 +1378,19 @@ function toggleCompositeUI(checked){
 
 function renderStockHistory(){
   const indexed = (state.stockHistory||[]).map((r,i)=>({...r, _idx:i})).reverse();
+  const shown = stockHistPageSize==='All' ? indexed : indexed.slice(0, parseInt(stockHistPageSize,10));
   return `
   ${header("Stock History","Kasaysayan ng Stock", true)}
   <main>
     <button class="btn" style="margin-bottom:14px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="go('inventory')">‹ Back to Inventory</button>
+    <select onchange="setStockHistPageSize(this.value)" style="margin-bottom:14px;">
+      <option value="10" ${stockHistPageSize==='10'?'selected':''}>Show 10</option>
+      <option value="20" ${stockHistPageSize==='20'?'selected':''}>Show 20</option>
+      <option value="30" ${stockHistPageSize==='30'?'selected':''}>Show 30</option>
+      <option value="All" ${stockHistPageSize==='All'?'selected':''}>Show All</option>
+    </select>
     <div class="card">
-      ${indexed.length===0 ? `<div class="empty">Wala pang history.</div>` : indexed.slice(0,150).map(r=>{
+      ${shown.length===0 ? `<div class="empty">Wala pang history.</div>` : shown.map(r=>{
         const dt = new Date(r.time);
         const dtStr = dt.toLocaleString('en-PH', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
         return `<div class="entry">
@@ -1379,6 +1404,7 @@ function renderStockHistory(){
     </div>
   </main>`;
 }
+function setStockHistPageSize(v){ stockHistPageSize = v; render(); }
 
 function delStockHistoryEntry(idx){
   const ok = confirm("Tanggalin ang entry na ito sa history? Hindi ito maibabalik.\n\nDelete this history entry? This cannot be undone.");
@@ -1416,7 +1442,7 @@ function openItemModal(editIndex){
     <label>Supplier</label>
     <input type="text" id="im-supplier" placeholder="Optional" value="${item?escapeHtml(item.supplier||''):''}">
     <label>Expiry Date <span style="font-weight:400; color:var(--ink-soft); font-size:11px;">(optional)</span></label>
-    <input type="date" id="im-expiry" value="${item?(item.expiryDate||''):''}">
+    ${buildDateSelects('im-expiry', item?item.expiryDate:'')}
 
     <label style="display:flex; align-items:center; gap:8px; margin:14px 0 10px; padding:10px; background:#FCF3DF; border-radius:10px;">
       <input type="checkbox" id="im-is-composite" ${isComp?'checked':''} onchange="toggleCompositeUI(this.checked)" style="width:auto;">
@@ -1472,7 +1498,7 @@ function saveItemForm(){
     name, category,
     storageType: document.getElementById('im-storage').value,
     supplier: document.getElementById('im-supplier').value.trim(),
-    expiryDate: document.getElementById('im-expiry').value || "",
+    expiryDate: readDateSelects('im-expiry'),
     isComposite
   };
 
@@ -1511,6 +1537,34 @@ function saveItemForm(){
   saveState();
   closeItemModal();
   render();
+}
+
+function buildDateSelects(prefix, isoVal){
+  const d = isoVal ? new Date(isoVal+"T00:00:00") : null;
+  const day = d ? d.getDate() : '';
+  const month = d ? d.getMonth()+1 : '';
+  const year = d ? d.getFullYear() : new Date().getFullYear();
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const curY = new Date().getFullYear();
+  const years = []; for(let y=curY-1;y<=curY+5;y++) years.push(y);
+  return `<div style="display:flex; gap:6px;">
+    <select id="${prefix}-day" style="flex:1;"><option value="">Day</option>
+      ${Array.from({length:31},(_,i)=>i+1).map(n=>`<option value="${n}" ${n===day?'selected':''}>${n}</option>`).join('')}
+    </select>
+    <select id="${prefix}-month" style="flex:1.3;"><option value="">Month</option>
+      ${months.map((m,i)=>`<option value="${i+1}" ${(i+1)===month?'selected':''}>${m}</option>`).join('')}
+    </select>
+    <select id="${prefix}-year" style="flex:1;"><option value="">Year</option>
+      ${years.map(y=>`<option value="${y}" ${y===year?'selected':''}>${y}</option>`).join('')}
+    </select>
+  </div>`;
+}
+function readDateSelects(prefix){
+  const day = document.getElementById(prefix+'-day').value;
+  const month = document.getElementById(prefix+'-month').value;
+  const year = document.getElementById(prefix+'-year').value;
+  if(!day || !month || !year) return "";
+  return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
 }
 
 function daysUntil(dateStr){
