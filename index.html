@@ -235,6 +235,17 @@
 .modal-title-row h3{ font-family:'Zilla Slab',serif; margin:0; color:var(--cover-dark); font-size:19px; }
 .modal-x{ background:var(--page-line); border:none; width:34px; height:34px; border-radius:10px; font-size:16px; color:var(--ink); }
 
+#notif-btn{
+  position:fixed; top:14px; right:14px; z-index:30;
+  background:var(--cover); color:#fff; border:none; width:42px; height:42px;
+  border-radius:10px; font-size:18px; box-shadow:0 2px 8px rgba(0,0,0,.3);
+}
+.notif-badge{
+  position:absolute; top:-4px; right:-4px; background:var(--bad); color:#fff;
+  font-size:10px; font-weight:700; border-radius:10px; min-width:18px; height:18px;
+  display:none; align-items:center; justify-content:center; padding:0 4px;
+}
+
 </style>
 </head>
 <body>
@@ -248,6 +259,7 @@
 <body>
 <div id="sync-banner" style="display:none; position:sticky; top:0; z-index:10; font-size:12.5px; padding:8px 14px; border-bottom:2px solid; text-align:center;"></div>
 <button id="hamburger-btn" onclick="toggleSidebar()">☰</button>
+<button id="notif-btn" onclick="openNotifPanel()">🔔<span id="notif-badge" class="notif-badge"></span></button>
 <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
 <div id="sidebar"></div>
 <div id="app-shell">
@@ -395,7 +407,10 @@ const CATEGORY_PREFIX = {
   "Produce":"PRD","Meat":"MEA","Household":"HHD","Toiletries":"TOI","Other":"GEN"
 };
 
-const APP_VERSION = "v22.1.0"; // bump this by hand with each future commit
+const SCHEDULE_TYPES = ["Fixed Day","Irregular","Canvass Only"];
+const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+
+const APP_VERSION = "v23.0.0"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -405,6 +420,7 @@ const NAV_ITEMS = [
   {view:'expansion', ic:'🔨', label:'Expansion (Stall)'},
   {view:'inventory', ic:'📦', label:'Inventory'},
   {view:'insights', ic:'📈', label:'Insights'},
+  {view:'suppliers', ic:'🚚', label:'Suppliers'},
   {view:'help', ic:'💡', label:'Help & Tips'},
 ];
 
@@ -428,6 +444,50 @@ function navFromSidebar(v){
   go(v);
 }
 
+function getNotifications(){
+  const notifs = [];
+  state.inventory.filter(r=>Number(r.stock)<=Number(r.reorder)).forEach(r=>
+    notifs.push({type:'Low Stock', text:`${r.name} — ${r.stock} ${r.unit} left`}));
+  state.inventory.filter(r=>{const d=daysUntil(r.expiryDate); return d!==null && d<=7;}).forEach(r=>
+    notifs.push({type:'Expiring Soon', text:`${r.name} — ${daysUntil(r.expiryDate)<0?'EXPIRED':daysUntil(r.expiryDate)+'d left'}`}));
+  state.payables.filter(p=>p.status!=="Paid").forEach(p=>
+    notifs.push({type:'Unpaid Loan', text:`${p.name} — ${peso(p.amt)} due ${p.due||'—'}`}));
+  (state.priceAlerts||[]).forEach((a,i)=>{ if(!a.acknowledged) notifs.push({type:'Price Alert', text:`${a.item} (${a.supplier}): ${peso(a.oldPrice)} → ${peso(a.newPrice)}`, alertIdx:i}); });
+  const todayName = WEEKDAYS[new Date().getDay()];
+  state.suppliers.filter(s=>s.scheduleType==='Fixed Day' && s.scheduleDay===todayName).forEach(s=>
+    notifs.push({type:'Supplier Today', text:`${s.name} — ${s.category||'scheduled today'}`}));
+  return notifs;
+}
+
+function openNotifPanel(){
+  const notifs = getNotifications();
+  const groups = {};
+  notifs.forEach(n=>{ if(!groups[n.type]) groups[n.type]=[]; groups[n.type].push(n); });
+  const sheet = document.getElementById('item-modal-sheet');
+  sheet.innerHTML = `
+    <div class="modal-title-row"><h3>🔔 Notices</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+    ${notifs.length===0 ? `<div class="empty">Walang bagong notice.</div>` : Object.keys(groups).map(type=>`
+      <div class="section-title" style="margin-top:12px; font-size:15px;">${type} (${groups[type].length})</div>
+      ${groups[type].map(n=>`<div class="entry"><div>${escapeHtml(n.text)}</div>${n.type==='Price Alert' ? `<button class="del" onclick="ackPriceAlert(${n.alertIdx})">✓</button>` : ''}</div>`).join('')}
+    `).join('')}
+  `;
+  document.getElementById('item-modal-overlay').classList.add('open');
+}
+
+function ackPriceAlert(idx){
+  state.priceAlerts[idx].acknowledged = true;
+  saveState();
+  openNotifPanel();
+}
+
+function updateNotifBadge(){
+  const badge = document.getElementById('notif-badge');
+  if(!badge) return;
+  const count = getNotifications().length;
+  badge.textContent = count;
+  badge.style.display = count>0 ? 'flex' : 'none';
+}
+
 
 function generateProductCode(category){
   const prefix = CATEGORY_PREFIX[category] || "GEN";
@@ -442,6 +502,8 @@ function generateProductCode(category){
 }
 
 function ensureInventoryFields(){
+  if(!state.suppliers) state.suppliers = [];
+  if(!state.priceAlerts) state.priceAlerts = [];
   state.inventory.forEach(it=>{
     if(!it.category) it.category = "Other";
     if(!it.storageType) it.storageType = "Dry";
@@ -449,6 +511,7 @@ function ensureInventoryFields(){
     if(!it.supplier) it.supplier = "";
     if(!it.code) it.code = generateProductCode(it.category);
     if(it.expiryDate === undefined) it.expiryDate = "";
+    if(!it.supplierPrices) it.supplierPrices = [];
   });
 }
 
@@ -460,7 +523,9 @@ let state = {
   inventory: [],
   householdHistory: [],
   stockHistory: [],
-  expansionLog: []
+  expansionLog: [],
+  suppliers: [],
+  priceAlerts: []
 };
 let modalCompositeLevels = [];
 let view = "home";
@@ -582,9 +647,11 @@ function render(){
   else if(view==="insights") html = renderInsights();
   else if(view==="stockHistory") html = renderStockHistory();
   else if(view==="expansion") html = renderExpansion();
+  else if(view==="suppliers") html = renderSuppliers();
   app.innerHTML = html;
   attachHandlers();
   renderSidebar();
+  updateNotifBadge();
   if(view==="insights"){
     const now = new Date();
     drawInsightCharts(window._selMonth || now.toISOString().slice(0,7));
@@ -619,20 +686,6 @@ function renderHome(){
       <div class="sumline"><span>Profit (Net Operating)</span><b>${peso(sum.opResult)}</b></div>
       <div class="sumline"><span>Household Budget</span><b class="amt neg">${peso(sum.householdTotal)}</b></div>
       <div class="sumline"><span>Net After Household Draw</span><b class="${sum.net>=0?'amt pos':'amt neg'}">${peso(sum.net)}</b></div>
-    </div>
-
-    <div class="section-title">Needs Your Attention</div>
-    <div class="tile" style="width:100%; margin-bottom:10px; flex-direction:row; justify-content:space-between; text-align:left; min-height:auto; padding:16px;" onclick="go('inventory')">
-      <span>📦 Low Stock Items</span>
-      <b class="${lowStockCount>0?'amt neg':'amt pos'}">${lowStockCount}</b>
-    </div>
-    <div class="tile" style="width:100%; margin-bottom:10px; flex-direction:row; justify-content:space-between; text-align:left; min-height:auto; padding:16px;" onclick="go('inventory')">
-      <span>⏳ Expiring Soon</span>
-      <b class="${expiringSoonCount>0?'amt neg':'amt pos'}">${expiringSoonCount}</b>
-    </div>
-    <div class="tile" style="width:100%; margin-bottom:18px; flex-direction:row; justify-content:space-between; text-align:left; min-height:auto; padding:16px;" onclick="go('payables')">
-      <span>📒 Unpaid Loans</span>
-      <b class="amt neg">${peso(sum.unpaidTotal)}</b>
     </div>
 
     <button class="btn" style="width:100%; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="refreshFromServer()">🔄 Refresh shared data / Kunin ang bagong data</button>
@@ -882,6 +935,63 @@ function markPaid(idx){
   const ok = confirm("Sigurado ka ba? Markahan itong bayad na. \n\nAre you sure? This will mark it as paid.");
   if(!ok) return;
   state.payables[idx].status = "Paid";
+  saveState();
+  render();
+}
+
+function renderSuppliers(){
+  const rows = [...state.suppliers].sort((a,b)=>a.name.localeCompare(b.name));
+  return `
+  ${header("Suppliers","Mga Supplier")}
+  <main>
+    <div class="card">
+      <label>Supplier Name</label>
+      <input type="text" id="sup-name" placeholder="e.g. Natural Spring">
+      <label>Category / Goods</label>
+      <input type="text" id="sup-category" placeholder="e.g. Water, Canned goods">
+      <label>Schedule</label>
+      <select id="sup-schedule-type" onchange="toggleSupplierDayField(this.value)">
+        ${SCHEDULE_TYPES.map(s=>`<option value="${s}">${s}</option>`).join('')}
+      </select>
+      <div id="sup-day-field">
+        <label>Which Day</label>
+        <select id="sup-schedule-day">${WEEKDAYS.map(d=>`<option value="${d}">${d}</option>`).join('')}</select>
+      </div>
+      <label>Notes <span style="font-weight:400; color:var(--ink-soft); font-size:11px;">(quality, favor status, reliability)</span></label>
+      <input type="text" id="sup-notes" placeholder="Optional">
+      <button class="btn btn-primary" onclick="addSupplier()">Save Supplier</button>
+    </div>
+    <div class="section-title">All Suppliers</div>
+    <div class="card">
+      ${rows.length===0 ? `<div class="empty">Wala pang supplier.</div>` : rows.map(r=>{
+        const idx = state.suppliers.indexOf(r);
+        return `<div class="entry">
+          <div>
+            <div><b>${escapeHtml(r.name)}</b></div>
+            <div class="meta">${escapeHtml(r.category||'')} · ${r.scheduleType}${r.scheduleType==='Fixed Day'?' ('+r.scheduleDay+')':''}</div>
+            ${r.notes?`<div class="meta">${escapeHtml(r.notes)}</div>`:''}
+          </div>
+          <button class="del" onclick="delItem('suppliers', ${idx})">✕</button>
+        </div>`;
+      }).join('')}
+    </div>
+  </main>`;
+}
+function toggleSupplierDayField(v){
+  const f = document.getElementById('sup-day-field');
+  if(f) f.style.display = v==='Fixed Day' ? '' : 'none';
+}
+function addSupplier(){
+  const name = document.getElementById('sup-name').value.trim();
+  if(!name) return;
+  const scheduleType = document.getElementById('sup-schedule-type').value;
+  state.suppliers.push({
+    name,
+    category: document.getElementById('sup-category').value.trim(),
+    scheduleType,
+    scheduleDay: scheduleType==='Fixed Day' ? document.getElementById('sup-schedule-day').value : '',
+    notes: document.getElementById('sup-notes').value.trim()
+  });
   saveState();
   render();
 }
@@ -1192,6 +1302,7 @@ function renderInventory(){
           </div>
           <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid #7A4E00; color:#7A4E00; padding:9px; font-size:13px;" onclick="spoilItem(${r._idx})">🗑 Spoiled / Wasted</button>
           <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--brass); color:var(--brass); padding:9px; font-size:13px;" onclick="openItemModal(${r._idx})">✏️ Edit Item</button>
+          <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--teal); color:var(--teal); padding:9px; font-size:13px;" onclick="openSupplierPriceModal(${r._idx})">💰 Update Supplier Price</button>
           <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--bad); color:var(--bad); padding:9px; font-size:13px;" onclick="delItem('inventory', ${r._idx})">Delete Item</button>
         </div>` : ''}
       </div>`;
@@ -1644,6 +1755,45 @@ function openMatrixCell(tier, movement){
     `).join('')}
   `;
   document.getElementById('item-modal-overlay').classList.add('open');
+}
+
+function openSupplierPriceModal(itemIdx){
+  const item = state.inventory[itemIdx];
+  const sheet = document.getElementById('item-modal-sheet');
+  if(state.suppliers.length===0){
+    sheet.innerHTML = `<div class="modal-title-row"><h3>Update Supplier Price</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+      <p class="subtitle">Add a supplier first.</p>
+      <button class="btn btn-primary" onclick="closeItemModal(); go('suppliers');">Go to Suppliers</button>`;
+    document.getElementById('item-modal-overlay').classList.add('open');
+    return;
+  }
+  sheet.innerHTML = `
+    <div class="modal-title-row"><h3>Update Supplier Price — ${escapeHtml(item.name)}</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+    <label>Supplier</label>
+    <select id="sp-supplier">${state.suppliers.map(s=>`<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('')}</select>
+    <label>Quoted Price (₱)</label>
+    <input type="number" id="sp-price" placeholder="0">
+    <button class="btn btn-primary" onclick="submitSupplierPrice(${itemIdx})">Save</button>
+    ${item.supplierPrices.length>0 ? `<div class="section-title" style="margin-top:16px;">Price History</div>
+      ${[...item.supplierPrices].reverse().map(p=>`<div class="sumline"><span>${escapeHtml(p.supplier)}</span><b>${peso(p.price)} · ${p.updatedAt.slice(0,10)}</b></div>`).join('')}
+    ` : ''}
+  `;
+  document.getElementById('item-modal-overlay').classList.add('open');
+}
+
+function submitSupplierPrice(itemIdx){
+  const item = state.inventory[itemIdx];
+  const supplier = document.getElementById('sp-supplier').value;
+  const price = parseFloat(document.getElementById('sp-price').value);
+  if(!supplier || isNaN(price) || price<=0){ alert('Please enter a valid price.'); return; }
+  const prior = [...item.supplierPrices].reverse().find(p=>p.supplier===supplier);
+  if(prior && prior.price !== price){
+    state.priceAlerts.push({item:item.name, supplier, oldPrice:prior.price, newPrice:price, date:todayStr(), acknowledged:false});
+  }
+  item.supplierPrices.push({supplier, price, updatedAt: new Date().toISOString()});
+  saveState();
+  closeItemModal();
+  render();
 }
 
 function daysUntil(dateStr){
