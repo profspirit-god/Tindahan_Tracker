@@ -395,7 +395,7 @@ const CATEGORY_PREFIX = {
   "Produce":"PRD","Meat":"MEA","Household":"HHD","Toiletries":"TOI","Other":"GEN"
 };
 
-const APP_VERSION = "v21.5.7"; // bump this by hand with each future commit
+const APP_VERSION = "v21.6.7"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -1109,6 +1109,7 @@ function renderInventory(){
 
   const val = getInventoryValue();
   const soon = state.inventory.filter(r => daysUntil(r.expiryDate)!==null && daysUntil(r.expiryDate)<=7);
+  const displayRows = invPageSize==='All' ? rows : rows.slice(0, parseInt(invPageSize,10));
 
   return `
   ${header("Inventory","Listahan ng mga Paninda")}
@@ -1152,9 +1153,8 @@ function renderInventory(){
     </div>
 
     <button class="btn btn-primary" style="margin-bottom:6px;" onclick="openItemModal()">+ Add New Item</button>
-    
+  
     <div class="section-title">Item List (${displayRows.length} of ${rows.length})</div>
-    const displayRows = invPageSize==='All' ? rows : rows.slice(0, parseInt(invPageSize,10));
     ${displayRows.length===0 ? `<div class="card"><div class="empty">Walang item na tugma.</div></div>` : displayRows.map(r=>{
       const low = Number(r.stock) <= Number(r.reorder);
       const margin = (Number(r.price)||0) - (Number(r.cost)||0);
