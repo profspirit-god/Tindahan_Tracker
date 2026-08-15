@@ -266,6 +266,12 @@
   <div id="item-modal-sheet"></div>
 </div>
 
+<datalist id="unit-suggestions">
+  <option value="Rim"><option value="Pack"><option value="Stick"><option value="Box"><option value="Carton">
+  <option value="Case"><option value="Tray"><option value="Roll"><option value="Sachet"><option value="Dozen">
+  <option value="Bottle"><option value="Can"><option value="Sack"><option value="Kg"><option value="Piece">
+</datalist>
+
 <div id="username-screen">
   <h2>👤 Sino Ka?</h2>
   <p>Enter your name (e.g. Father, Mother, Tita, your name)</p>
@@ -383,13 +389,13 @@ const DEFAULT_HOUSEHOLD = [
 
 const CATEGORIES = ["Grocery","Beverages","Frozen","Dry Goods","Produce","Meat","Household","Toiletries","Other"];
 const STORAGE_TYPES = ["Frozen","Chilled","Dry","Perishable"];
-const UNITS = ["pcs","bottle","can","box","sachet","pack","dozen","sack","kg","g","L","mL","oz"];
+const UNITS = ["pcs","bottle","can","box","sachet","pack","dozen","sack","kg","g","L","mL","oz","rim","carton","case","tray","roll","stick"];
 const CATEGORY_PREFIX = {
   "Grocery":"GRO","Beverages":"BEV","Frozen":"FRZ","Dry Goods":"DRY",
   "Produce":"PRD","Meat":"MEA","Household":"HHD","Toiletries":"TOI","Other":"GEN"
 };
 
-const APP_VERSION = "v20.5.6"; // bump this by hand with each future commit
+const APP_VERSION = "v21.5.6"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -456,6 +462,7 @@ let state = {
   stockHistory: [],
   expansionLog: []
 };
+let modalCompositeLevels = [];
 let view = "home";
 let loaded = false;
 let syncStatus = "unknown";
@@ -1141,7 +1148,7 @@ function renderInventory(){
         <div class="item-row-head" onclick="toggleExpand(${r._idx})">
           <div>
             <b>${escapeHtml(r.name)}</b><span class="code-badge">${r.code}</span> ${low?`<span class="pill overdue">LOW</span>`:''} ${(dLeft!==null && dLeft<=7) ? `<span class="pill overdue" style="background:#F4D9A0; color:#7A4E00;">${dLeft<0?'EXPIRED':'EXPIRING'}</span>` : ''}
-            <div class="meta">Stock: ${r.stock} ${r.unit} · ${r.category}</div>
+            <div class="meta">Stock: ${r.isComposite ? breakdownStock(r) : `${r.stock} ${r.unit}`} · ${r.category}</div>
           </div>
           <span class="chevron ${isOpen?'open':''}">▶</span>
         </div>
@@ -1149,9 +1156,13 @@ function renderInventory(){
           <div class="sumline"><span>Storage Type</span><b>${r.storageType}</b></div>
           <div class="sumline"><span>Expiry Date</span><b>${r.expiryDate || 'Not set'}</b></div>
           <div class="sumline"><span>Supplier</span><b>${escapeHtml(r.supplier)||'—'}</b></div>
-          <div class="sumline"><span>Cost / Unit</span><b>${peso(r.cost)}</b></div>
-          <div class="sumline"><span>Sell Price</span><b>${peso(r.price)}</b></div>
-          <div class="sumline"><span>Margin / Unit</span><b>${peso(margin)}</b></div>
+          ${r.isComposite ? r.compositeLevels.map(l=>`
+            <div class="sumline"><span>${escapeHtml(l.unit)}${l.forSale?'':' (not sold)'}</span><b>${l.forSale ? `${peso(l.cost)} → ${peso(l.price)} (margin ${peso(l.price-l.cost)})` : `cost ${peso(l.cost)}`}</b></div>
+          `).join('') : `
+            <div class="sumline"><span>Cost / Unit</span><b>${peso(r.cost)}</b></div>
+            <div class="sumline"><span>Sell Price</span><b>${peso(r.price)}</b></div>
+            <div class="sumline"><span>Margin / Unit</span><b>${peso(margin)}</b></div>
+          `}
           <div class="sumline"><span>Reorder At</span><b>${r.reorder} ${r.unit}</b></div>
           <div class="sumline"><span>Est. Days of Stock Left</span><b>${(() => {
             const rate = getDailySellRate(r.name);
@@ -1180,42 +1191,68 @@ function setInvStorageFilter(v){ invStorageFilter = v; render(); }
 function toggleExpand(i){ expandedItemIdx = (expandedItemIdx===i) ? -1 : i; render(); }
 
 function restockItem(i){
-  const input = prompt(`Ilan ang idadagdag sa stock ng ${state.inventory[i].name}?\n\nHow many units to add to ${state.inventory[i].name}?`);
+  const item = state.inventory[i];
+  if(item.isComposite){ openQtyModal(i, 'restock'); return; }
+  const input = prompt(`Ilan ang idadagdag sa stock ng ${item.name}?\n\nHow many ${item.unit} to add?`);
   if(input === null) return;
   const qty = parseFloat(input);
-  if(isNaN(qty) || qty <= 0){ alert("Please enter a valid amount."); return; }
-  const oldStock = Number(state.inventory[i].stock)||0;
-  const newStock = oldStock + qty;
-  logStockChange(state.inventory[i].name, 'Restock', qty, oldStock, newStock);
-  state.inventory[i].stock = newStock;
-  saveState();
-  render();
+  if(isNaN(qty) || qty<=0){ alert("Please enter a valid amount."); return; }
+  applyStockDelta(i, 'restock', qty, item.unit);
 }
-
 function sellItem(i){
-  const input = prompt(`Ilan ang naibenta/nagamit na ${state.inventory[i].name}?\n\nHow many units sold/used of ${state.inventory[i].name}?`);
+  const item = state.inventory[i];
+  if(item.isComposite){ openQtyModal(i, 'sell'); return; }
+  const input = prompt(`Ilan ang naibenta/nagamit na ${item.name}?\n\nHow many ${item.unit} sold/used?`);
   if(input === null) return;
   const qty = parseFloat(input);
-  if(isNaN(qty) || qty <= 0){ alert("Please enter a valid amount."); return; }
-  const oldStock = Number(state.inventory[i].stock)||0;
-  const newStock = Math.max(0, oldStock - qty);
-  logStockChange(state.inventory[i].name, 'Sold/Used', -qty, oldStock, newStock);
-  state.inventory[i].stock = newStock;
+  if(isNaN(qty) || qty<=0){ alert("Please enter a valid amount."); return; }
+  applyStockDelta(i, 'sell', qty, item.unit);
+}
+function spoilItem(i){
+  const item = state.inventory[i];
+  if(item.isComposite){ openQtyModal(i, 'spoil'); return; }
+  const input = prompt(`Ilan ang nasira/naaksaya na ${item.name}?\n\nHow many ${item.unit} spoiled/wasted?`);
+  if(input === null) return;
+  const qty = parseFloat(input);
+  if(isNaN(qty) || qty<=0){ alert("Please enter a valid amount."); return; }
+  applyStockDelta(i, 'spoil', qty, item.unit);
+}
+
+function applyStockDelta(idx, action, baseAmt, unitLabel){
+  const item = state.inventory[idx];
+  const oldStock = Number(item.stock)||0;
+  const qtyChange = action==='restock' ? baseAmt : -baseAmt;
+  const newStock = action==='restock' ? oldStock + baseAmt : Math.max(0, oldStock - baseAmt);
+  const actionLabel = action==='restock' ? 'Restock' : action==='sell' ? 'Sold/Used' : 'Spoiled/Wasted';
+  logStockChange(item.name, unitLabel ? `${actionLabel} (${unitLabel})` : actionLabel, qtyChange, oldStock, newStock);
+  item.stock = newStock;
   saveState();
+  closeItemModal();
   render();
 }
 
-function spoilItem(i){
-  const input = prompt(`Ilan ang nasira/naaksaya na ${state.inventory[i].name}?\n\nHow many units of ${state.inventory[i].name} were spoiled/wasted?`);
-  if(input === null) return;
-  const qty = parseFloat(input);
-  if(isNaN(qty) || qty <= 0){ alert("Please enter a valid amount."); return; }
-  const oldStock = Number(state.inventory[i].stock)||0;
-  const newStock = Math.max(0, oldStock - qty);
-  logStockChange(state.inventory[i].name, 'Spoiled/Wasted', -qty, oldStock, newStock);
-  state.inventory[i].stock = newStock;
-  saveState();
-  render();
+function openQtyModal(itemIdx, action){
+  const item = state.inventory[itemIdx];
+  const titleMap = {restock:'Restock', sell:'Sold / Used', spoil:'Spoiled / Wasted'};
+  const sheet = document.getElementById('item-modal-sheet');
+  sheet.innerHTML = `
+    <div class="modal-title-row"><h3>${titleMap[action]} — ${escapeHtml(item.name)}</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+    <label>Unit</label>
+    <select id="qty-unit">${item.compositeLevels.map((l,i)=>`<option value="${i}">${escapeHtml(l.unit)}</option>`).join('')}</select>
+    <label>Quantity</label>
+    <input type="number" id="qty-amount" placeholder="0">
+    <button class="btn btn-primary" onclick="submitQtyModal(${itemIdx}, '${action}')">Confirm</button>
+  `;
+  document.getElementById('item-modal-overlay').classList.add('open');
+}
+
+function submitQtyModal(itemIdx, action){
+  const item = state.inventory[itemIdx];
+  const levelIdx = parseInt(document.getElementById('qty-unit').value,10);
+  const amt = parseFloat(document.getElementById('qty-amount').value);
+  if(isNaN(amt) || amt<=0){ alert('Please enter a valid amount.'); return; }
+  const baseAmt = amt * unitsPerBase(item.compositeLevels, levelIdx);
+  applyStockDelta(itemIdx, action, baseAmt, `${amt} ${item.compositeLevels[levelIdx].unit}`);
 }
 
 function getInventoryValue(){
@@ -1244,6 +1281,81 @@ function logStockChange(itemName, action, qtyChange, oldStock, newStock){
     item: itemName, action, qtyChange, oldStock, newStock,
     by: currentUser || 'Unknown', time: new Date().toISOString()
   });
+}
+
+function unitsPerBase(levels, idx){
+  let units = 1;
+  for(let i=idx; i<levels.length-1; i++){
+    units *= Number(levels[i].multiplier)||1;
+  }
+  return units;
+}
+
+function breakdownStock(item){
+  if(!item.isComposite) return `${item.stock} ${item.unit}`;
+  let remaining = Number(item.stock)||0;
+  const parts = [];
+  for(let i=0;i<item.compositeLevels.length;i++){
+    const per = unitsPerBase(item.compositeLevels, i);
+    const count = Math.floor(remaining / per);
+    if(count>0){ parts.push(`${count} ${item.compositeLevels[i].unit}${count!==1?'s':''}`); remaining -= count*per; }
+  }
+  return parts.length===0 ? `0 ${item.compositeLevels[item.compositeLevels.length-1].unit}` : parts.join(', ');
+}
+
+function renderLevelsUI(){
+  const container = document.getElementById('im-levels-container');
+  if(!container) return;
+  container.innerHTML = modalCompositeLevels.map((lvl,i)=>{
+    const isLast = i === modalCompositeLevels.length-1;
+    return `<div class="card" style="padding:12px; margin-bottom:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <b>Level ${i+1}${isLast?' (base — smallest unit)':''}</b>
+        ${modalCompositeLevels.length>2 ? `<button class="del" onclick="removeLevel(${i})">✕</button>` : ''}
+      </div>
+      <label style="margin-top:8px;">Unit Name</label>
+      <input type="text" list="unit-suggestions" value="${escapeHtml(lvl.unit)}" onchange="updateLevelField(${i},'unit',this.value)">
+      ${!isLast ? `
+      <label>Contains how many of the next smaller unit?</label>
+      <input type="number" value="${lvl.multiplier}" onchange="updateLevelField(${i},'multiplier',this.value)">
+      ` : ''}
+      <label style="display:flex; align-items:center; gap:8px; margin-top:8px;">
+        <input type="checkbox" ${lvl.forSale?'checked':''} onchange="updateLevelField(${i},'forSale',this.checked)" style="width:auto;">
+        Sold at this level
+      </label>
+      <div class="row2">
+        <div><label>Cost (₱)</label><input type="number" value="${lvl.cost}" onchange="updateLevelField(${i},'cost',this.value)"></div>
+        <div><label>Sell Price (₱)</label><input type="number" value="${lvl.price}" onchange="updateLevelField(${i},'price',this.value)"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateLevelField(i, field, val){
+  if(field==='forSale') modalCompositeLevels[i][field] = val;
+  else if(field==='multiplier' || field==='cost' || field==='price') modalCompositeLevels[i][field] = parseFloat(val)||0;
+  else modalCompositeLevels[i][field] = val;
+}
+
+function addLevelBelow(){
+  modalCompositeLevels.push({unit:'', multiplier:1, forSale:true, cost:0, price:0});
+  renderLevelsUI();
+}
+function removeLevel(i){
+  modalCompositeLevels.splice(i,1);
+  renderLevelsUI();
+}
+
+function toggleCompositeUI(checked){
+  document.getElementById('im-simple-fields').style.display = checked ? 'none' : '';
+  document.getElementById('im-composite-fields').style.display = checked ? '' : 'none';
+  if(checked && modalCompositeLevels.length===0){
+    modalCompositeLevels = [
+      {unit:'Pack', multiplier:10, forSale:true, cost:0, price:0},
+      {unit:'Stick', multiplier:1, forSale:true, cost:0, price:0}
+    ];
+    renderLevelsUI();
+  }
 }
 
 function renderStockHistory(){
@@ -1283,6 +1395,8 @@ function selectOptions(list, selected){
 function openItemModal(editIndex){
   itemModalEditIndex = (editIndex===undefined) ? null : editIndex;
   const item = itemModalEditIndex!==null ? state.inventory[itemModalEditIndex] : null;
+  modalCompositeLevels = (item && item.isComposite) ? JSON.parse(JSON.stringify(item.compositeLevels)) : [];
+  const isComp = !!(item && item.isComposite);
   const sheet = document.getElementById('item-modal-sheet');
   sheet.innerHTML = `
     <div class="modal-title-row">
@@ -1290,7 +1404,7 @@ function openItemModal(editIndex){
       <button class="modal-x" onclick="closeItemModal()">✕</button>
     </div>
     <label>Item Name</label>
-    <input type="text" id="im-name" placeholder="e.g. Bottled water 250mL" value="${item?escapeHtml(item.name):''}">
+    <input type="text" id="im-name" placeholder="e.g. Marlboro Red" value="${item?escapeHtml(item.name):''}">
     <div class="row2">
       <div><label>Category</label>
         <select id="im-category">${selectOptions(CATEGORIES, item?item.category:CATEGORIES[0])}</select>
@@ -1299,25 +1413,48 @@ function openItemModal(editIndex){
         <select id="im-storage">${selectOptions(STORAGE_TYPES, item?item.storageType:STORAGE_TYPES[0])}</select>
       </div>
     </div>
-    <div class="row2">
-      <div><label>Counting Unit <span style="font-weight:400; color:var(--ink-soft); font-size:11px;">(how you count stock)</span></label>
-        <select id="im-unit">${selectOptions(UNITS, item?item.unit:UNITS[0])}</select>
-      </div>
-      <div><label>Supplier</label><input type="text" id="im-supplier" placeholder="Optional" value="${item?escapeHtml(item.supplier||''):''}"></div>
-    </div>
-    <div class="row2">
-      <div><label>Cost / Unit (₱)</label><input type="number" id="im-cost" placeholder="0" value="${item?item.cost:''}"></div>
-      <div><label>Sell Price (₱)</label><input type="number" id="im-price" placeholder="0" value="${item?item.price:''}"></div>
-    </div>
-    <div class="row2">
-      <div><label>Current Stock</label><input type="number" id="im-stock" placeholder="0" value="${item?item.stock:''}"></div>
-      <div><label>Reorder Point</label><input type="number" id="im-reorder" placeholder="0" value="${item?item.reorder:''}"></div>
-    </div>
+    <label>Supplier</label>
+    <input type="text" id="im-supplier" placeholder="Optional" value="${item?escapeHtml(item.supplier||''):''}">
     <label>Expiry Date <span style="font-weight:400; color:var(--ink-soft); font-size:11px;">(optional)</span></label>
     <input type="date" id="im-expiry" value="${item?(item.expiryDate||''):''}">
+
+    <label style="display:flex; align-items:center; gap:8px; margin:14px 0 10px; padding:10px; background:#FCF3DF; border-radius:10px;">
+      <input type="checkbox" id="im-is-composite" ${isComp?'checked':''} onchange="toggleCompositeUI(this.checked)" style="width:auto;">
+      This is a composite product <span style="font-weight:400; font-size:12px;">(e.g. Rim → Pack → Stick)</span>
+    </label>
+
+    <div id="im-simple-fields" style="${isComp?'display:none;':''}">
+      <label>Counting Unit</label>
+      <select id="im-unit">${selectOptions(UNITS, item?item.unit:UNITS[0])}</select>
+      <div class="row2">
+        <div><label>Cost / Unit (₱)</label><input type="number" id="im-cost" value="${item&&!isComp?item.cost:''}"></div>
+        <div><label>Sell Price (₱)</label><input type="number" id="im-price" value="${item&&!isComp?item.price:''}"></div>
+      </div>
+      <div class="row2">
+        <div><label>Current Stock</label><input type="number" id="im-stock" value="${item&&!isComp?item.stock:''}"></div>
+        <div><label>Reorder Point</label><input type="number" id="im-reorder" value="${item&&!isComp?item.reorder:''}"></div>
+      </div>
+    </div>
+
+    <div id="im-composite-fields" style="${isComp?'':'display:none;'}">
+      <div class="row2">
+        <div><label>Current Stock <span style="font-size:10px;">(base unit)</span></label><input type="number" id="im-stock-composite" value="${isComp?item.stock:''}"></div>
+        <div><label>Reorder Point <span style="font-size:10px;">(base unit)</span></label><input type="number" id="im-reorder-composite" value="${isComp?item.reorder:''}"></div>
+      </div>
+      <div id="im-levels-container"></div>
+      <button class="btn" style="background:var(--brass); color:#fff; width:100%; margin-bottom:10px;" onclick="addLevelBelow()">+ Add Level Below</button>
+    </div>
+
     <button class="btn btn-primary" onclick="saveItemForm()">${item ? 'Save Changes' : 'Save Item'}</button>
   `;
   document.getElementById('item-modal-overlay').classList.add('open');
+  if(isComp) renderLevelsUI();
+}
+
+function closeItemModal(){
+  document.getElementById('item-modal-overlay').classList.remove('open');
+  itemModalEditIndex = null;
+  modalCompositeLevels = [];
 }
 
 function closeItemModal(){
@@ -1329,22 +1466,46 @@ function saveItemForm(){
   const name = document.getElementById('im-name').value.trim();
   if(!name){ alert('Item name is required.'); return; }
   const category = document.getElementById('im-category').value;
+  const isComposite = document.getElementById('im-is-composite').checked;
+
   const data = {
     name, category,
     storageType: document.getElementById('im-storage').value,
-    unit: document.getElementById('im-unit').value,
     supplier: document.getElementById('im-supplier').value.trim(),
-    cost: parseFloat(document.getElementById('im-cost').value)||0,
-    price: parseFloat(document.getElementById('im-price').value)||0,
-    stock: parseFloat(document.getElementById('im-stock').value)||0,
-    reorder: parseFloat(document.getElementById('im-reorder').value)||0,
-    expiryDate: document.getElementById('im-expiry').value || ""
+    expiryDate: document.getElementById('im-expiry').value || "",
+    isComposite
   };
+
+  if(isComposite){
+    if(modalCompositeLevels.length < 2){ alert('A composite product needs at least 2 levels.'); return; }
+    if(modalCompositeLevels.some(l=>!l.unit || !l.unit.trim())){ alert('Every level needs a unit name.'); return; }
+    data.compositeLevels = modalCompositeLevels.map((l,i)=>({
+      unit: l.unit.trim(),
+      multiplier: i===modalCompositeLevels.length-1 ? 1 : (Number(l.multiplier)||1),
+      forSale: !!l.forSale,
+      cost: Number(l.cost)||0,
+      price: Number(l.price)||0
+    }));
+    const base = data.compositeLevels[data.compositeLevels.length-1];
+    data.unit = base.unit;
+    data.cost = base.cost;
+    data.price = base.price;
+    data.stock = parseFloat(document.getElementById('im-stock-composite').value)||0;
+    data.reorder = parseFloat(document.getElementById('im-reorder-composite').value)||0;
+  } else {
+    data.compositeLevels = null;
+    data.unit = document.getElementById('im-unit').value;
+    data.cost = parseFloat(document.getElementById('im-cost').value)||0;
+    data.price = parseFloat(document.getElementById('im-price').value)||0;
+    data.stock = parseFloat(document.getElementById('im-stock').value)||0;
+    data.reorder = parseFloat(document.getElementById('im-reorder').value)||0;
+  }
+
   if(itemModalEditIndex === null){
     data.code = generateProductCode(category);
     state.inventory.push(data);
   } else {
-    data.code = state.inventory[itemModalEditIndex].code; // keep the original code even if category changes
+    data.code = state.inventory[itemModalEditIndex].code;
     state.inventory[itemModalEditIndex] = data;
   }
   saveState();
