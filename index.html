@@ -395,7 +395,7 @@ const CATEGORY_PREFIX = {
   "Produce":"PRD","Meat":"MEA","Household":"HHD","Toiletries":"TOI","Other":"GEN"
 };
 
-const APP_VERSION = "v21.6.7"; // bump this by hand with each future commit
+const APP_VERSION = "v22.0.0"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -1567,6 +1567,80 @@ function readDateSelects(prefix){
   return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
 }
 
+const ACTION_MAP = {
+  'A-Fast':'✅ Stock Up', 'A-Slow':'⚠️ Investigate', 'A-Dead':'🚩 Urgent Review',
+  'B-Fast':'✅ Maintain', 'B-Slow':'👀 Monitor', 'B-Dead':'⚠️ Consider Drop',
+  'C-Fast':'✅ Maintain (small qty)', 'C-Slow':'🗑 Consider Drop/Clearance', 'C-Dead':'🗑 Drop'
+};
+
+function getInventoryHealthData(){
+  const cutoff15 = Date.now() - 15*86400000;
+  const cutoff45 = Date.now() - 45*86400000;
+
+  const stats = state.inventory.map(it=>{
+    const soldEntries = (state.stockHistory||[]).filter(h=>h.item===it.name && h.action && h.action.startsWith('Sold'));
+    const sold15 = soldEntries.filter(h=>new Date(h.time).getTime()>=cutoff15);
+    const qty15 = sold15.reduce((s,h)=>s+Math.abs(h.qtyChange||0),0);
+    const revenue15 = qty15 * (Number(it.price)||0);
+    const lastSoldTime = soldEntries.length ? Math.max(...soldEntries.map(h=>new Date(h.time).getTime())) : null;
+    const isDead = !lastSoldTime || lastSoldTime < cutoff45;
+    const rate = qty15/15;
+    const daysLeft = rate>0 ? (Number(it.stock)||0)/rate : null;
+    let movement;
+    if(isDead) movement='Dead';
+    else if(daysLeft!==null && daysLeft<15) movement='Fast';
+    else movement='Slow';
+    return {item:it, revenue15, movement};
+  });
+
+  const totalRevenue = stats.reduce((s,r)=>s+r.revenue15,0);
+  const sorted = [...stats].sort((a,b)=>b.revenue15-a.revenue15);
+  let cum = 0;
+  sorted.forEach(r=>{
+    cum += r.revenue15;
+    const pct = totalRevenue>0 ? cum/totalRevenue : 1;
+    r.tier = pct<=0.8 ? 'A' : pct<=0.95 ? 'B' : 'C';
+  });
+  return stats;
+}
+
+function getGMROI(sel){
+  const sum = getMonthSummary(sel);
+  const val = getInventoryValue();
+  if(val.costValue<=0) return null;
+  return sum.opResult / val.costValue;
+}
+
+function renderHealthMatrix(){
+  const stats = getInventoryHealthData();
+  const tiers=['A','B','C'], moves=['Fast','Slow','Dead'];
+  const colorFor = m => m==='Fast' ? 'var(--good-bg)' : m==='Dead' ? 'var(--bad-bg)' : '#FCF3DF';
+  let html = `<div style="display:grid; grid-template-columns:36px repeat(3,1fr); gap:6px; font-size:12px;">
+    <div></div><div style="text-align:center; font-weight:700;">Fast</div><div style="text-align:center; font-weight:700;">Slow</div><div style="text-align:center; font-weight:700;">Dead</div>`;
+  tiers.forEach(t=>{
+    html += `<div style="font-weight:700; display:flex; align-items:center;">${t}</div>`;
+    moves.forEach(m=>{
+      const count = stats.filter(r=>r.tier===t && r.movement===m).length;
+      html += `<div onclick="openMatrixCell('${t}','${m}')" style="background:${colorFor(m)}; border-radius:8px; text-align:center; padding:14px 4px; font-weight:700; cursor:pointer;">${count}</div>`;
+    });
+  });
+  html += `</div>`;
+  return html;
+}
+
+function openMatrixCell(tier, movement){
+  const data = getInventoryHealthData().filter(r=>r.tier===tier && r.movement===movement);
+  const action = ACTION_MAP[`${tier}-${movement}`] || '';
+  const sheet = document.getElementById('item-modal-sheet');
+  sheet.innerHTML = `
+    <div class="modal-title-row"><h3>${tier} · ${movement} — ${action}</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+    ${data.length===0 ? `<div class="empty">Walang item dito.</div>` : data.map(r=>`
+      <div class="sumline"><span>${escapeHtml(r.item.name)}</span><b>${peso(r.revenue15)} (15d)</b></div>
+    `).join('')}
+  `;
+  document.getElementById('item-modal-overlay').classList.add('open');
+}
+
 function daysUntil(dateStr){
   if(!dateStr) return null;
   const today = new Date(todayStr());
@@ -1720,6 +1794,18 @@ function renderInsights(){
     <div class="card">
       <div class="sumline"><span>Total This Month</span><b class="amt neg">${peso(getExpansionInsights(sel).total)}</b></div>
       <canvas id="expansionCanvas" height="180" style="margin-top:10px;"></canvas>
+    </div>
+    <div class="section-title" style="margin-top:20px;">Inventory Health Matrix</div>
+    <div class="card">
+      <div class="sumline"><span>GMROI (Profit ÷ Stock Value)</span><b>${(() => {
+        const g = getGMROI(sel);
+        return g===null ? 'Not enough data' : `${g.toFixed(2)}x`;
+      })()}</b></div>
+      <p class="subtitle" style="margin:6px 0 0;">Above 1x = your stock investment is generating more profit than it costs to hold.</p>
+    </div>
+    <div class="card">
+      ${renderHealthMatrix()}
+      <p class="subtitle" style="margin-top:10px;">Tap any cell to see which items landed there.</p>
     </div>
   </main>`;
 }
