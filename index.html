@@ -260,6 +260,7 @@
 <div id="sync-banner" style="display:none; position:sticky; top:0; z-index:10; font-size:12.5px; padding:8px 14px; border-bottom:2px solid; text-align:center;"></div>
 <button id="hamburger-btn" onclick="toggleSidebar()">☰</button>
 <button id="notif-btn" onclick="openNotifPanel()">🔔<span id="notif-badge" class="notif-badge"></span></button>
+<button id="undo-btn" onclick="undoLast()" style="display:none; position:fixed; top:14px; right:70px; z-index:30; background:var(--cover); color:#fff; border:none; width:42px; height:42px; border-radius:10px; font-size:18px; box-shadow:0 2px 8px rgba(0,0,0,.3);">↶</button>
 <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
 <div id="sidebar"></div>
 <div id="app-shell">
@@ -410,7 +411,7 @@ const CATEGORY_PREFIX = {
 const SCHEDULE_TYPES = ["Fixed Day","Irregular","Canvass Only"];
 const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-const APP_VERSION = "v24.0.0"; // bump this by hand with each future commit
+const APP_VERSION = "v25.0.0"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -648,6 +649,86 @@ async function verifyBackupContent(content, expectedHash){
   return h === expectedHash;
 }
 
+// Undo stack: stores recent destructive actions for quick reversible restore
+let undoStack = [];
+
+function pushUndo(action){
+  // action: {type, label, data}
+  action._pushedAt = new Date().toISOString();
+  undoStack.push(action);
+  showUndoIndicator();
+  // Auto-expire after 30s
+  setTimeout(()=>{
+    const idx = undoStack.indexOf(action);
+    if(idx !== -1){ undoStack.splice(idx,1); showUndoIndicator(); }
+  }, 30000);
+}
+
+function showUndoIndicator(){
+  const btn = document.getElementById('undo-btn');
+  if(!btn) return;
+  if(undoStack.length>0){ btn.style.display = 'flex'; btn.title = undoStack[undoStack.length-1].label || 'Undo last action'; }
+  else btn.style.display = 'none';
+}
+
+function undoLast(){
+  if(undoStack.length===0){ alert('Nothing to undo'); return; }
+  const action = undoStack.pop();
+  try{
+    switch(action.type){
+      case 'delete-row':
+        // restore a deleted row at original index
+        if(!state[action.key]) state[action.key] = [];
+        state[action.key].splice(action.idx, 0, action.item);
+        break;
+      case 'delete-household-cat':
+        if(!state.household) state.household = [];
+        state.household.splice(action.idx, 0, action.item);
+        break;
+      case 'delete-stock-history':
+        if(!state.stockHistory) state.stockHistory = [];
+        state.stockHistory.splice(action.idx, 0, action.item);
+        break;
+      case 'delete-household-history':
+        if(!state.householdHistory) state.householdHistory = [];
+        state.householdHistory.splice(action.idx, 0, action.item);
+        break;
+      case 'reset-snapshot':
+        state = Object.assign({}, action.snapshot);
+        break;
+      default:
+        console.warn('Unknown undo action', action);
+    }
+    saveState();
+    render();
+    alert('Undo completed: ' + (action.label||action.type));
+  } catch(err){
+    console.error('Undo failed', err);
+    alert('Undo failed: ' + err.message);
+  }
+  showUndoIndicator();
+}
+
+// Expose a helper for reversible migrations: pass forward and backward functions
+async function runReversibleMigration(name, forwardFn, backwardFn){
+  if(!confirm(`Run migration: ${name}?`)) return false;
+  // Take snapshot so we can undo if needed
+  const snapshot = JSON.parse(JSON.stringify(state));
+  try{
+    await forwardFn(state);
+    await saveState();
+    pushUndo({type:'reset-snapshot', label:`Undo migration ${name}`, snapshot});
+    alert(`Migration ${name} applied. An undo entry is available for 30s.`);
+    return true;
+  } catch(err){
+    // rollback to snapshot
+    state = snapshot;
+    await saveState();
+    alert(`Migration ${name} failed and was rolled back: ${err.message}`);
+    return false;
+  }
+}
+
 function go(v){
   view = v;
   render();
@@ -783,6 +864,8 @@ function renderHome(){
 function resetData(){
   const ok = confirm("This will permanently delete Daily Entries, Gcash logs, and Loans, and zero out household 'actual' spending. Top Items will NOT be touched. Continue?");
   if(!ok) return;
+  const snapshot = JSON.parse(JSON.stringify(state));
+  pushUndo({type:'reset-snapshot', label:'Restore full state (reset)', snapshot});
   state.dailyLogs = [];
   state.gcashLogs = [];
   state.payables = [];
@@ -1204,6 +1287,8 @@ function renderHouseholdHistory(){
 function delHistoryEntry(idx){
   const ok = confirm("Tanggalin ang entry na ito sa history? Hindi ito maibabalik.\n\nDelete this history entry? This cannot be undone.");
   if(!ok) return;
+  const item = JSON.parse(JSON.stringify(state.householdHistory[idx]));
+  pushUndo({type:'delete-household-history', label:'Restore household history', idx: idx, item});
   state.householdHistory.splice(idx, 1);
   saveState();
   render();
@@ -1271,6 +1356,8 @@ function delHouseholdCat(i){
   const catName = state.household[i].cat;
   const ok = confirm(`Alisin ang "${catName}" sa listahan?\n\nRemove "${catName}" from the list? Past history stays, only future tracking stops.`);
   if(!ok) return;
+  const item = JSON.parse(JSON.stringify(state.household[i]));
+  pushUndo({type:'delete-household-cat', label:`Restore household category ${catName}`, idx: i, item});
   if(!state.householdHistory) state.householdHistory = [];
   state.householdHistory.push({
     cat: catName,
@@ -1607,6 +1694,8 @@ function setStockHistPageSize(v){ stockHistPageSize = v; render(); }
 function delStockHistoryEntry(idx){
   const ok = confirm("Tanggalin ang entry na ito sa history? Hindi ito maibabalik.\n\nDelete this history entry? This cannot be undone.");
   if(!ok) return;
+  const item = JSON.parse(JSON.stringify(state.stockHistory[idx]));
+  pushUndo({type:'delete-stock-history', label:'Restore stock history', idx: idx, item});
   state.stockHistory.splice(idx, 1);
   saveState();
   render();
@@ -2242,6 +2331,8 @@ function delItem(key, idx){
   if(idx<0) return;
   const ok = confirm("Sigurado ka ba? Tatanggalin ito. \n\nAre you sure? This will delete this entry.");
   if(!ok) return;
+  const item = JSON.parse(JSON.stringify(state[key][idx]));
+  pushUndo({type:'delete-row', label:`Restore ${key}`, key, idx, item});
   state[key].splice(idx,1);
   saveState();
   render();
