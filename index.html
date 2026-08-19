@@ -410,7 +410,7 @@ const CATEGORY_PREFIX = {
 const SCHEDULE_TYPES = ["Fixed Day","Irregular","Canvass Only"];
 const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-const APP_VERSION = "v23.0.0"; // bump this by hand with each future commit
+const APP_VERSION = "v24.0.0"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -577,12 +577,75 @@ async function loadState(){
   loaded = true;
 }
 
+let isReadOnly = false;
+
 async function saveState(){
+  if(isReadOnly){
+    console.warn("Read-only mode ON — skipping saveState");
+    syncStatus = "readonly";
+    return;
+  }
   const { error } = await sb
     .from("app_state")
     .update({ data: state })
     .eq("id", 1);
   syncStatus = error ? "error" : "ok";
+}
+
+function toggleReadOnly(){
+  isReadOnly = !isReadOnly;
+  alert(isReadOnly ? "Read-only mode enabled — writes are now skipped." : "Read-only disabled — writes allowed.");
+  render();
+}
+
+async function computeSHA256(text){
+  const enc = new TextEncoder();
+  const buf = await crypto.subtle.digest('SHA-256', enc.encode(text));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+async function exportAllData(){
+  const content = JSON.stringify(state, null, 2);
+  const hash = await computeSHA256(content);
+  const ts = new Date().toISOString().replace(/[:.]/g,'-');
+  downloadFile(`tindahan_state_${ts}.json`, 'application/json;charset=utf-8', content);
+  alert('Exported full app state. SHA256: ' + hash);
+}
+
+async function exportRows(table){
+  if(!state[table]){ alert('No such table: ' + table); return; }
+  const content = JSON.stringify(state[table], null, 2);
+  const hash = await computeSHA256(content);
+  const ts = new Date().toISOString().replace(/[:.]/g,'-');
+  downloadFile(`${table}_rows_${ts}.json`, 'application/json;charset=utf-8', content);
+  alert(`Exported ${table}. SHA256: ${hash}`);
+}
+
+function importAllDataFromFile(){
+  if(isReadOnly){ alert('Read-only mode is enabled — disable it before importing.'); return; }
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = '.json,application/json';
+  fileInput.onchange = async (e) => {
+    const f = e.target.files[0];
+    if(!f) return;
+    const text = await f.text();
+    let parsed;
+    try{ parsed = JSON.parse(text); } catch(err){ alert('File is not valid JSON. Aborting.'); return; }
+    const ok = confirm('This will overwrite the current app state with the file you selected. A backup will be downloaded first. Continue?');
+    if(!ok) return;
+    await exportAllData(); // create a backup first
+    state = Object.assign({}, parsed);
+    await saveState();
+    alert('Import complete. State has been overwritten and saved to server.');
+    render();
+  };
+  fileInput.click();
+}
+
+async function verifyBackupContent(content, expectedHash){
+  const h = await computeSHA256(content);
+  return h === expectedHash;
 }
 
 function go(v){
@@ -693,8 +756,27 @@ function renderHome(){
 
     <div class="section-title" style="margin-top:22px;">Data Tools</div>
     <button class="btn" style="width:100%; background:var(--brass); color:#fff;" onclick="downloadWordSummary()">⬇ Download Summary (Word)</button>
-    <button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--bad); color:var(--bad);" onclick="resetData()">🗑 Reset for a Clean Slate</button>
-    <p class="subtitle" style="margin-top:6px;">Reset clears Today's Entries, GCash, Loans, and household spending totals only. Top Items is always kept.</p>
+    <button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="exportAllData()">📦 Export full app state (JSON)</button>
+    <div style="display:flex; gap:8px; margin-top:8px;">
+      <select id="data-table-select" style="flex:1; padding:10px;">
+        <option value="dailyLogs">Daily Entries</option>
+        <option value="gcashLogs">GCash Logs</option>
+        <option value="payables">Payables</option>
+        <option value="household">Household</option>
+        <option value="inventory">Inventory</option>
+        <option value="householdHistory">Household History</option>
+        <option value="stockHistory">Stock History</option>
+        <option value="expansionLog">Expansion Log</option>
+        <option value="suppliers">Suppliers</option>
+      </select>
+      <button class="btn" style="flex:0 0 160px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="exportRows(document.getElementById('data-table-select').value)">Export table</button>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:8px;">
+      <button class="btn" style="flex:1; background:transparent; border:1.5px solid var(--bad); color:var(--bad);" onclick="resetData()">🗑 Reset for a Clean Slate</button>
+      <button class="btn" style="flex:1; background:transparent; border:1.5px solid #666; color:#666;" onclick="toggleReadOnly()">🔒 Toggle Read-only</button>
+    </div>
+    <button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid #444; color:#444;" onclick="importAllDataFromFile()">⬆️ Import state from file (JSON)</button>
+    <p class="subtitle" style="margin-top:6px;">Reset clears Today's Entries, GCash, Loans, and household spending totals only. Top Items is always kept. Use export before risky actions.</p>
   </main>`;
 }
 
