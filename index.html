@@ -411,7 +411,7 @@ const CATEGORY_PREFIX = {
 const SCHEDULE_TYPES = ["Fixed Day","Irregular","Canvass Only"];
 const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-const APP_VERSION = "v26.0.0"; // bump this by hand with each future commit
+const APP_VERSION = "v26.1.0"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -548,6 +548,7 @@ let modalCompositeLevels = [];
 let view = "home";
 let loaded = false;
 let syncStatus = "unknown";
+let lastKnownSavedAt = null; // used to detect if another device saved since we last loaded
 let invSearch = "";
 let invCategoryFilter = "All";
 let invStorageFilter = "All";
@@ -587,6 +588,7 @@ async function loadState(){
     if (!state.household || state.household.length === 0) {
       state.household = DEFAULT_HOUSEHOLD.map(h => ({ ...h }));
     }
+    lastKnownSavedAt = (state._meta && state._meta.lastSavedAt) || null;
     syncStatus = "ok";
   } else {
     syncStatus = "error";
@@ -602,6 +604,24 @@ async function saveState(){
     syncStatus = "readonly";
     return;
   }
+  if(lastKnownSavedAt){
+    const { data: current } = await sb
+      .from("app_state")
+      .select("data")
+      .eq("id", 1)
+      .single();
+    const serverSavedAt = current && current.data && current.data._meta ? current.data._meta.lastSavedAt : null;
+    if(serverSavedAt && serverSavedAt !== lastKnownSavedAt){
+      const proceed = confirm("⚠️ Someone else updated the data on another device since this one last loaded.\n\nSaving now may overwrite their changes.\n\nOK = Save anyway\nCancel = Don't save (refresh the page first to get the latest data)");
+      if(!proceed){
+        syncStatus = "conflict";
+        return;
+      }
+    }
+  }
+  const now = new Date().toISOString();
+  state._meta = { lastSavedAt: now, lastSavedBy: currentUser };
+  lastKnownSavedAt = now;
   const { error } = await sb
     .from("app_state")
     .update({ data: state })
