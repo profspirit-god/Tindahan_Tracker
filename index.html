@@ -411,7 +411,7 @@ const CATEGORY_PREFIX = {
 const SCHEDULE_TYPES = ["Fixed Day","Irregular","Canvass Only"];
 const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-const APP_VERSION = "v27.0.0"; // bump this by hand with each future commit
+const APP_VERSION = "v27.1.0"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -445,6 +445,10 @@ function navFromSidebar(v){
   go(v);
 }
 
+function getLastDailyLogDate(){
+  if(!state.dailyLogs || state.dailyLogs.length===0) return null;
+  return state.dailyLogs.reduce((max,r)=> (r.date && r.date>max) ? r.date : max, state.dailyLogs[0].date||"");
+}
 function getNotifications(){
   const notifs = [];
   state.inventory.filter(r=>Number(r.stock)<=Number(r.reorder)).forEach(r=>
@@ -478,6 +482,15 @@ function getNotifications(){
   const todayName = WEEKDAYS[new Date().getDay()];
   state.suppliers.filter(s=>s.scheduleType==='Fixed Day' && s.scheduleDay===todayName).forEach(s=>
     notifs.push({type:'Supplier Today', text:`${s.name} — ${s.category||'scheduled today'}`}));
+  const lastLog = getLastDailyLogDate();
+  if(lastLog){
+    const daysSince = -daysUntil(lastLog);
+    if(daysSince >= 2){
+      notifs.push({type:'No Entry', text:`No Today's Entry logged in ${daysSince} days — last entry was ${lastLog}`});
+    } else if(daysSince === 1 && new Date().getHours() >= 18){
+      notifs.push({type:'No Entry', text:`Wala pang naitala ngayong araw — no entry logged yet today.`});
+    }
+  }
   return notifs;
 }
 
