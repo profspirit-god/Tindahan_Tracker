@@ -411,7 +411,7 @@ const CATEGORY_PREFIX = {
 const SCHEDULE_TYPES = ["Fixed Day","Irregular","Canvass Only"];
 const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-const APP_VERSION = "v26.1.0"; // bump this by hand with each future commit
+const APP_VERSION = "v27.0.0"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -451,7 +451,7 @@ function getNotifications(){
     notifs.push({type:'Low Stock', text:`${r.name} — ${r.stock} ${r.unit} left`}));
   state.inventory.filter(r=>{const d=daysUntil(r.expiryDate); return d!==null && d<=7;}).forEach(r=>
     notifs.push({type:'Expiring Soon', text:`${r.name} — ${daysUntil(r.expiryDate)<0?'EXPIRED':daysUntil(r.expiryDate)+'d left'}`}));
-   state.payables.forEach(p=>{
+     state.payables.forEach(p=>{
     const balance = getPayableBalance(p);
     if(balance<=0) return;
     if(p.type==="Installment"){
@@ -459,6 +459,16 @@ function getNotifications(){
       const d = nextDue ? daysUntil(nextDue) : null;
       if(d!==null && d<=3){
         notifs.push({type:'Unpaid Loan', text:`${p.name} — ${peso(balance)} left, ${d<0?'OVERDUE since '+nextDue:(d===0?'due today':'due '+nextDue)}`});
+      }
+    } else if(p.type==="Consignment"){
+      const nextDue = getConsignmentNextDue(p);
+      if(nextDue===null){
+        notifs.push({type:'Unpaid Loan', text:`${p.name} (consignment) — ${peso(balance)} owed`});
+      } else {
+        const d = daysUntil(nextDue);
+        if(d!==null && d<=3){
+          notifs.push({type:'Unpaid Loan', text:`${p.name} (consignment) — ${peso(balance)} owed, next visit ${d===0?'today':nextDue}`});
+        }
       }
     } else {
       notifs.push({type:'Unpaid Loan', text:`${p.name} — ${peso(balance)} due ${p.due||'—'}`});
@@ -519,7 +529,8 @@ function ensureInventoryFields(){
   if(!state.payables) state.payables = [];
   state.payables.forEach(p=>{
     if(!p.type) p.type = "One-time";
-    if(p.type==="Installment" && !p.history) p.history = [];
+    if((p.type==="Installment" || p.type==="Consignment") && !p.history) p.history = [];
+    if(p.type==="Consignment" && !p.linkedItemIds) p.linkedItemIds = [];
   });
   state.inventory.forEach(it=>{
     if(!it.category) it.category = "Other";
@@ -529,6 +540,7 @@ function ensureInventoryFields(){
     if(!it.code) it.code = generateProductCode(it.category);
     if(it.expiryDate === undefined) it.expiryDate = "";
     if(!it.supplierPrices) it.supplierPrices = [];
+    if(it.consignmentStock === undefined) it.consignmentStock = 0;
   });
 }
 
@@ -1076,10 +1088,31 @@ function addGcash(){
 function getInstallmentPaid(p){
   return (p.history||[]).reduce((s,h)=>s+(h.amount||0),0);
 }
+function getConsignmentBalance(p){
+  const accrued = (p.history||[]).filter(h=>h.kind!=="remittance").reduce((s,h)=>s+(h.amount||0),0);
+  const remitted = (p.history||[]).filter(h=>h.kind==="remittance").reduce((s,h)=>s+(h.amount||0),0);
+  return Math.max(0, accrued - remitted);
+}
+function getConsignmentPayableForItem(code){
+  return state.payables.find(p=>p.type==="Consignment" && (p.linkedItemIds||[]).includes(code));
+}
+function getConsignmentNextDue(p){
+  const supplier = (state.suppliers||[]).find(s=>s.name===p.name);
+  if(!supplier || supplier.scheduleType!=="Fixed Day" || !supplier.scheduleDay) return null;
+  const today = new Date(todayStr());
+  const targetIdx = WEEKDAYS.indexOf(supplier.scheduleDay);
+  if(targetIdx<0) return null;
+  const diff = (targetIdx - today.getDay() + 7) % 7;
+  const due = new Date(today);
+  due.setDate(due.getDate()+diff);
+  return due.toISOString().slice(0,10);
+}
 function getPayableBalance(p){
   if(p.type==="Installment") return Math.max(0, (p.totalAmt||0) - getInstallmentPaid(p));
+  if(p.type==="Consignment") return getConsignmentBalance(p);
   return p.status==="Paid" ? 0 : (p.amt||0);
 }
+
 function getInstallmentNextDue(p){
   if(!p.startDate || !p.frequency) return null;
   const today = new Date(todayStr());
@@ -1097,9 +1130,8 @@ function getInstallmentNextDue(p){
 function renderPayables(){
   const today = todayStr();
   const rows = [...state.payables].sort((a,b)=>{
-    const da = a.type==="Installment" ? (getInstallmentNextDue(a)||"") : (a.due||"");
-    const db = b.type==="Installment" ? (getInstallmentNextDue(b)||"") : (b.due||"");
-    return da.localeCompare(db);
+    const dueOf = p => p.type==="Installment" ? (getInstallmentNextDue(p)||"") : p.type==="Consignment" ? (getConsignmentNextDue(p)||"") : (p.due||"");
+    return dueOf(a).localeCompare(dueOf(b));
   });
   return `
   ${header("Utang / Loans","Utang sa Supplier at Pautang", true)}
@@ -1109,9 +1141,21 @@ function renderPayables(){
       <select id="p-type" onchange="onLoanTypeChange()">
         <option value="One-time">One-time — Isang Bayad</option>
         <option value="Installment">Installment — Hulugan</option>
+        <option value="Consignment">Consignment — Paninda sa Utang</option>
       </select>
-      <label>Supplier / Lender — Pinagkunan</label>
-      <input type="text" id="p-name" placeholder="e.g. Ate Nena, Panel supplier">
+
+      <div id="p-name-field">
+        <label>Supplier / Lender — Pinagkunan</label>
+        <input type="text" id="p-name" placeholder="e.g. Ate Nena, Panel supplier">
+      </div>
+
+      <div id="p-consignment-supplier-field" style="display:none;">
+        <label>Supplier — Nagbibigay ng Paninda</label>
+        ${state.suppliers.length===0
+          ? `<p class="subtitle">No suppliers yet — <a href="#" onclick="go('suppliers'); return false;">add one first</a>.</p>`
+          : `<select id="p-consign-supplier">${state.suppliers.map(s=>`<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('')}</select>`}
+      </div>
+
       <label>Item or Reason — Dahilan</label>
       <input type="text" id="p-item" placeholder="e.g. Sardinas restock">
 
@@ -1140,6 +1184,21 @@ function renderPayables(){
         </div>
       </div>
 
+      <div id="p-consignment-fields" style="display:none;">
+        <label>Linked Products — Mga Paninda sa Utang</label>
+        ${state.inventory.length===0 ? `<p class="subtitle">Add inventory items first.</p>` : `
+        <div style="max-height:180px; overflow-y:auto; border:1px solid #ddd; border-radius:8px; padding:8px;">
+          ${state.inventory.map(it=>`
+            <label style="display:flex; align-items:center; gap:8px; padding:6px 0; font-weight:400;">
+              <input type="checkbox" class="p-consign-item" value="${it.code}" style="width:auto;"> ${escapeHtml(it.name)}
+            </label>
+          `).join('')}
+        </div>`}
+        <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-weight:400;">
+          <input type="checkbox" id="p-charge-spoilage" style="width:auto;"> Charge for spoiled/wasted units too
+        </label>
+      </div>
+
       <button class="btn btn-primary" onclick="addPayable()">Save Entry</button>
     </div>
     <div class="section-title">All Utang / Loans</div>
@@ -1147,24 +1206,31 @@ function renderPayables(){
       ${rows.length===0 ? `<div class="empty">Wala pang utang na naka-record.</div>` : rows.map(r=>{
         const idx = state.payables.indexOf(r);
         const isInstallment = r.type==="Installment";
+        const isConsignment = r.type==="Consignment";
         const balance = getPayableBalance(r);
-        const nextDue = isInstallment ? getInstallmentNextDue(r) : r.due;
+        const nextDue = isInstallment ? getInstallmentNextDue(r) : isConsignment ? getConsignmentNextDue(r) : r.due;
         const dLeft = (balance>0 && nextDue) ? daysUntil(nextDue) : null;
         const overdue = dLeft!==null && dLeft<0;
         const paidOff = balance<=0;
         const pillClass = paidOff ? "paid" : (overdue?"overdue":"unpaid");
-        const pillText = paidOff ? "Paid" : (overdue?"OVERDUE":(isInstallment?"Ongoing":"Unpaid"));
+        const pillText = paidOff ? "Paid" : (overdue?"OVERDUE":((isInstallment||isConsignment)?"Ongoing":"Unpaid"));
+        const typeTag = isInstallment ? "Installment" : (isConsignment ? "Consignment" : "");
+        const supplierInfo = isConsignment ? (state.suppliers||[]).find(s=>s.name===r.name) : null;
+        const dueLabel = isConsignment
+          ? (nextDue ? `Next visit ${nextDue}` : `Visit: ${supplierInfo ? supplierInfo.scheduleType : "Not set"}`)
+          : (isInstallment ? `Next due ${nextDue||'—'}` : `Due ${r.due||'—'}`);
         return `<div class="entry">
           <div>
-            <div><b>${escapeHtml(r.name)}</b> <span class="pill ${pillClass}">${pillText}</span> ${isInstallment?`<span class="pill" style="background:var(--brass); color:#fff;">Installment</span>`:''}</div>
-            <div class="meta">${escapeHtml(r.item||'')} · ${isInstallment ? `Next due ${nextDue||'—'}` : `Due ${r.due||'—'}`} · by ${r.loggedBy||'-'}</div>
+            <div><b>${escapeHtml(r.name)}</b> <span class="pill ${pillClass}">${pillText}</span> ${typeTag?`<span class="pill" style="background:var(--brass); color:#fff;">${typeTag}</span>`:''}</div>
+            <div class="meta">${escapeHtml(r.item||'')} · ${dueLabel} · by ${r.loggedBy||'-'}</div>
             ${isInstallment ? `<div class="meta">Paid ${peso(getInstallmentPaid(r))} of ${peso(r.totalAmt)}</div>` : ''}
+            ${isConsignment ? `<div class="meta">Covers: ${(r.linkedItemIds||[]).map(code=>{const it=state.inventory.find(i=>i.code===code); return it?escapeHtml(it.name):code;}).join(', ')||'—'}</div>` : ''}
           </div>
           <div style="text-align:right;">
             <div class="amt neg">${peso(balance)}</div>
             <div style="margin-top:4px; display:flex; gap:6px; justify-content:flex-end;">
-              ${isInstallment
-                ? (balance>0 ? `<button class="btn btn-ghost" style="border-color:var(--good); color:var(--good); padding:5px 10px; font-size:12px;" onclick="openLoanPaymentModal(${idx})">Log Payment</button>` : '')
+              ${(isInstallment||isConsignment)
+                ? (balance>0 ? `<button class="btn btn-ghost" style="border-color:var(--good); color:var(--good); padding:5px 10px; font-size:12px;" onclick="openLoanPaymentModal(${idx})">${isConsignment?'Log Remittance':'Log Payment'}</button>` : '')
                 : (r.status!=="Paid" ? `<button class="btn btn-ghost" style="border-color:var(--good); color:var(--good); padding:5px 10px; font-size:12px;" onclick="markPaid(${idx})">Mark Paid</button>` : '')
               }
               <button class="del" onclick="delItem('payables', ${idx})">✕</button>
@@ -1177,14 +1243,38 @@ function renderPayables(){
 }
 function onLoanTypeChange(){
   const type = document.getElementById('p-type').value;
+  document.getElementById('p-name-field').style.display = type==="Consignment" ? "none" : "";
+  document.getElementById('p-consignment-supplier-field').style.display = type==="Consignment" ? "" : "none";
   document.getElementById('p-onetime-fields').style.display = type==="One-time" ? "" : "none";
   document.getElementById('p-installment-fields').style.display = type==="Installment" ? "" : "none";
+  document.getElementById('p-consignment-fields').style.display = type==="Consignment" ? "" : "none";
 }
 function addPayable(){
-  const name = document.getElementById('p-name').value.trim();
-  if(!name) return;
   const type = document.getElementById('p-type').value;
   const item = document.getElementById('p-item').value.trim();
+
+  if(type === "Consignment"){
+    const supplierEl = document.getElementById('p-consign-supplier');
+    if(!supplierEl){ alert('Add a supplier first (Suppliers tab).'); return; }
+    const linkedItemIds = Array.from(document.querySelectorAll('.p-consign-item:checked')).map(el=>el.value);
+    if(linkedItemIds.length===0){ alert('Select at least one product for this consignment agreement.'); return; }
+    state.payables.push({
+      type: "Consignment",
+      name: supplierEl.value,
+      item,
+      linkedItemIds,
+      chargeForSpoilage: document.getElementById('p-charge-spoilage').checked,
+      history: [],
+      loggedBy: currentUser
+    });
+    saveState();
+    render();
+    return;
+  }
+
+  const name = document.getElementById('p-name').value.trim();
+  if(!name) return;
+
   if(type === "Installment"){
     const totalAmt = parseFloat(document.getElementById('p-total').value)||0;
     if(totalAmt<=0){ alert('Please enter a valid total amount.'); return; }
@@ -1221,20 +1311,22 @@ function markPaid(idx){
   saveState();
   render();
 }
+
 function openLoanPaymentModal(idx){
   const p = state.payables[idx];
   const balance = getPayableBalance(p);
+  const isConsignment = p.type==="Consignment";
   const sheet = document.getElementById('item-modal-sheet');
   sheet.innerHTML = `
-    <div class="modal-title-row"><h3>Log Payment — ${escapeHtml(p.name)}</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+    <div class="modal-title-row"><h3>${isConsignment?'Log Remittance':'Log Payment'} — ${escapeHtml(p.name)}</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
     <p class="subtitle">Balance: ${peso(balance)}</p>
-    <label>Payment Amount (₱)</label>
+    <label>${isConsignment?'Remittance':'Payment'} Amount (₱)</label>
     <input type="number" id="lp-amt" placeholder="0" inputmode="decimal">
     <label>Date</label>
     <input type="date" id="lp-date" value="${todayStr()}">
-    <button class="btn btn-primary" onclick="submitLoanPayment(${idx})">Save Payment</button>
-    ${(p.history&&p.history.length>0) ? `<div class="section-title" style="margin-top:16px;">Payment History</div>
-      ${[...p.history].reverse().map(h=>`<div class="sumline"><span>${h.date} · ${escapeHtml(h.by||'-')}</span><b>${peso(h.amount)}</b></div>`).join('')}
+    <button class="btn btn-primary" onclick="submitLoanPayment(${idx})">Save</button>
+    ${(p.history&&p.history.length>0) ? `<div class="section-title" style="margin-top:16px;">History</div>
+      ${[...p.history].reverse().map(h=>`<div class="sumline"><span>${h.date}${h.kind?' · '+h.kind:''} · ${escapeHtml(h.by||'-')}${h.note?' · '+escapeHtml(h.note):''}</span><b class="${h.kind==='remittance'?'amt pos':'amt neg'}">${h.kind==='remittance'?'−':'+'}${peso(h.amount)}</b></div>`).join('')}
     ` : ''}
   `;
   document.getElementById('item-modal-overlay').classList.add('open');
@@ -1243,9 +1335,9 @@ function submitLoanPayment(idx){
   const p = state.payables[idx];
   const amount = parseFloat(document.getElementById('lp-amt').value);
   const date = document.getElementById('lp-date').value || todayStr();
-  if(isNaN(amount) || amount<=0){ alert('Please enter a valid payment amount.'); return; }
+  if(isNaN(amount) || amount<=0){ alert('Please enter a valid amount.'); return; }
   if(!p.history) p.history = [];
-  p.history.push({date, amount, by: currentUser});
+  p.history.push({date, amount, by: currentUser, kind: 'remittance'});
   saveState();
   closeItemModal();
   render();
@@ -1606,6 +1698,7 @@ function renderInventory(){
             <div class="sumline"><span>Margin / Unit</span><b>${peso(margin)}</b></div>
           `}
           <div class="sumline"><span>Reorder At</span><b>${r.reorder} ${r.unit}</b></div>
+          ${Number(r.consignmentStock)>0 ? `<div class="sumline"><span>Consignment Stock (unpaid)</span><b class="amt neg">${r.consignmentStock} ${r.unit}</b></div>` : ''}
           <div class="sumline"><span>Est. Days of Stock Left</span><b>${(() => {
             const rate = getDailySellRate(r.name);
             if(rate <= 0) return 'Not enough sales data yet';
@@ -1642,7 +1735,7 @@ function setInvPageSize(v){ invPageSize = v; render(); }
 
 function restockItem(i){
   const item = state.inventory[i];
-  if(item.isComposite){ openQtyModal(i, 'restock'); return; }
+  if(item.isComposite || getConsignmentPayableForItem(item.code)){ openQtyModal(i, 'restock'); return; }
   const input = prompt(`Ilan ang idadagdag sa stock ng ${item.name}?\n\nHow many ${item.unit} to add?`);
   if(input === null) return;
   const qty = parseFloat(input);
@@ -1668,13 +1761,38 @@ function spoilItem(i){
   applyStockDelta(i, 'spoil', qty, item.unit);
 }
 
-function applyStockDelta(idx, action, baseAmt, unitLabel){
+function applyStockDelta(idx, action, baseAmt, unitLabel, source){
   const item = state.inventory[idx];
   const oldStock = Number(item.stock)||0;
   const qtyChange = action==='restock' ? baseAmt : -baseAmt;
   const newStock = action==='restock' ? oldStock + baseAmt : Math.max(0, oldStock - baseAmt);
   const actionLabel = action==='restock' ? 'Restock' : action==='sell' ? 'Sold/Used' : 'Spoiled/Wasted';
-  logStockChange(item.name, unitLabel ? `${actionLabel} (${unitLabel})` : actionLabel, qtyChange, oldStock, newStock);
+
+  if(action==='restock' && source==='consignment'){
+    item.consignmentStock = (Number(item.consignmentStock)||0) + baseAmt;
+  } else if(action!=='restock'){
+    const removed = oldStock - newStock;
+    const consignUsed = Math.min(Number(item.consignmentStock)||0, removed);
+    if(consignUsed > 0){
+      item.consignmentStock = (Number(item.consignmentStock)||0) - consignUsed;
+      const payable = getConsignmentPayableForItem(item.code);
+      if(payable){
+        const accrue = action==='sell' || (action==='spoil' && payable.chargeForSpoilage);
+        if(accrue){
+          if(!payable.history) payable.history = [];
+          payable.history.push({
+            date: todayStr(),
+            amount: consignUsed * (Number(item.cost)||0),
+            kind: action==='sell' ? 'sale-accrual' : 'spoilage-accrual',
+            by: currentUser,
+            note: `${item.name} × ${consignUsed}`
+          });
+        }
+      }
+    }
+  }
+
+  logStockChange(item.name, unitLabel ? `${actionLabel} (${unitLabel})${source==='consignment'?' [Consignment]':''}` : actionLabel, qtyChange, oldStock, newStock);
   item.stock = newStock;
   saveState();
   closeItemModal();
@@ -1685,12 +1803,23 @@ function openQtyModal(itemIdx, action){
   const item = state.inventory[itemIdx];
   const titleMap = {restock:'Restock', sell:'Sold / Used', spoil:'Spoiled / Wasted'};
   const sheet = document.getElementById('item-modal-sheet');
+  const consignPayable = action==='restock' ? getConsignmentPayableForItem(item.code) : null;
+  const unitOptions = item.isComposite
+    ? item.compositeLevels.map((l,i)=>`<option value="${i}">${escapeHtml(l.unit)}</option>`).join('')
+    : `<option value="0">${escapeHtml(item.unit)}</option>`;
   sheet.innerHTML = `
     <div class="modal-title-row"><h3>${titleMap[action]} — ${escapeHtml(item.name)}</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
     <label>Unit</label>
-    <select id="qty-unit">${item.compositeLevels.map((l,i)=>`<option value="${i}">${escapeHtml(l.unit)}</option>`).join('')}</select>
+    <select id="qty-unit">${unitOptions}</select>
     <label>Quantity</label>
     <input type="number" id="qty-amount" placeholder="0">
+    ${consignPayable ? `
+      <label>Stock Source — Pinagmulan ng Stock</label>
+      <select id="qty-source">
+        <option value="owned">Owned — Binayaran na</option>
+        <option value="consignment">Consignment — from ${escapeHtml(consignPayable.name)}</option>
+      </select>
+    ` : ''}
     <button class="btn btn-primary" onclick="submitQtyModal(${itemIdx}, '${action}')">Confirm</button>
   `;
   document.getElementById('item-modal-overlay').classList.add('open');
@@ -1701,8 +1830,10 @@ function submitQtyModal(itemIdx, action){
   const levelIdx = parseInt(document.getElementById('qty-unit').value,10);
   const amt = parseFloat(document.getElementById('qty-amount').value);
   if(isNaN(amt) || amt<=0){ alert('Please enter a valid amount.'); return; }
-  const baseAmt = amt * unitsPerBase(item.compositeLevels, levelIdx);
-  applyStockDelta(itemIdx, action, baseAmt, `${amt} ${item.compositeLevels[levelIdx].unit}`);
+  const baseAmt = item.isComposite ? amt * unitsPerBase(item.compositeLevels, levelIdx) : amt;
+  const unitLabel = item.isComposite ? `${amt} ${item.compositeLevels[levelIdx].unit}` : `${amt} ${item.unit}`;
+  const sourceEl = document.getElementById('qty-source');
+  applyStockDelta(itemIdx, action, baseAmt, unitLabel, sourceEl ? sourceEl.value : undefined);
 }
 
 function getInventoryValue(){
