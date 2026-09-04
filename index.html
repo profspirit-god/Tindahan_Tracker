@@ -411,7 +411,7 @@ const CATEGORY_PREFIX = {
 const SCHEDULE_TYPES = ["Fixed Day","Irregular","Canvass Only"];
 const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-const APP_VERSION = "v25.0.0"; // bump this by hand with each future commit
+const APP_VERSION = "v26.0.0"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -451,8 +451,19 @@ function getNotifications(){
     notifs.push({type:'Low Stock', text:`${r.name} — ${r.stock} ${r.unit} left`}));
   state.inventory.filter(r=>{const d=daysUntil(r.expiryDate); return d!==null && d<=7;}).forEach(r=>
     notifs.push({type:'Expiring Soon', text:`${r.name} — ${daysUntil(r.expiryDate)<0?'EXPIRED':daysUntil(r.expiryDate)+'d left'}`}));
-  state.payables.filter(p=>p.status!=="Paid").forEach(p=>
-    notifs.push({type:'Unpaid Loan', text:`${p.name} — ${peso(p.amt)} due ${p.due||'—'}`}));
+   state.payables.forEach(p=>{
+    const balance = getPayableBalance(p);
+    if(balance<=0) return;
+    if(p.type==="Installment"){
+      const nextDue = getInstallmentNextDue(p);
+      const d = nextDue ? daysUntil(nextDue) : null;
+      if(d!==null && d<=3){
+        notifs.push({type:'Unpaid Loan', text:`${p.name} — ${peso(balance)} left, ${d<0?'OVERDUE since '+nextDue:(d===0?'due today':'due '+nextDue)}`});
+      }
+    } else {
+      notifs.push({type:'Unpaid Loan', text:`${p.name} — ${peso(balance)} due ${p.due||'—'}`});
+    }
+  });
   (state.priceAlerts||[]).forEach((a,i)=>{ if(!a.acknowledged) notifs.push({type:'Price Alert', text:`${a.item} (${a.supplier}): ${peso(a.oldPrice)} → ${peso(a.newPrice)}`, alertIdx:i}); });
   const todayName = WEEKDAYS[new Date().getDay()];
   state.suppliers.filter(s=>s.scheduleType==='Fixed Day' && s.scheduleDay===todayName).forEach(s=>
@@ -505,6 +516,11 @@ function generateProductCode(category){
 function ensureInventoryFields(){
   if(!state.suppliers) state.suppliers = [];
   if(!state.priceAlerts) state.priceAlerts = [];
+  if(!state.payables) state.payables = [];
+  state.payables.forEach(p=>{
+    if(!p.type) p.type = "One-time";
+    if(p.type==="Installment" && !p.history) p.history = [];
+  });
   state.inventory.forEach(it=>{
     if(!it.category) it.category = "Other";
     if(!it.storageType) it.storageType = "Dry";
@@ -1037,42 +1053,100 @@ function addGcash(){
   render();
 }
 
-
+function getInstallmentPaid(p){
+  return (p.history||[]).reduce((s,h)=>s+(h.amount||0),0);
+}
+function getPayableBalance(p){
+  if(p.type==="Installment") return Math.max(0, (p.totalAmt||0) - getInstallmentPaid(p));
+  return p.status==="Paid" ? 0 : (p.amt||0);
+}
+function getInstallmentNextDue(p){
+  if(!p.startDate || !p.frequency) return null;
+  const today = new Date(todayStr());
+  let due = new Date(p.startDate);
+  if(p.frequency==="monthly"){
+    while(due < today) due.setMonth(due.getMonth()+1);
+  } else if(p.frequency==="annual"){
+    while(due < today) due.setFullYear(due.getFullYear()+1);
+  } else {
+    const step = p.frequency==="weekly" ? 7 : 1; // daily default
+    while(due < today) due.setDate(due.getDate()+step);
+  }
+  return due.toISOString().slice(0,10);
+}
 function renderPayables(){
-  const rows = [...state.payables].sort((a,b)=>(a.due||"").localeCompare(b.due||""));
   const today = todayStr();
+  const rows = [...state.payables].sort((a,b)=>{
+    const da = a.type==="Installment" ? (getInstallmentNextDue(a)||"") : (a.due||"");
+    const db = b.type==="Installment" ? (getInstallmentNextDue(b)||"") : (b.due||"");
+    return da.localeCompare(db);
+  });
   return `
   ${header("Utang / Loans","Utang sa Supplier at Pautang", true)}
   <main>
     <div class="card">
+      <label>Loan Type — Uri ng Utang</label>
+      <select id="p-type" onchange="onLoanTypeChange()">
+        <option value="One-time">One-time — Isang Bayad</option>
+        <option value="Installment">Installment — Hulugan</option>
+      </select>
       <label>Supplier / Lender — Pinagkunan</label>
       <input type="text" id="p-name" placeholder="e.g. Ate Nena, Panel supplier">
       <label>Item or Reason — Dahilan</label>
       <input type="text" id="p-item" placeholder="e.g. Sardinas restock">
-      <label>Amount Owed (₱) — Halaga ng Utang</label>
-      <input type="number" id="p-amt" placeholder="0" inputmode="decimal">
-      <div class="row2">
-        <div><label>Date Received</label><input type="date" id="p-received" value="${today}"></div>
-        <div><label>Due Date</label><input type="date" id="p-due"></div>
+
+      <div id="p-onetime-fields">
+        <label>Amount Owed (₱) — Halaga ng Utang</label>
+        <input type="number" id="p-amt" placeholder="0" inputmode="decimal">
+        <div class="row2">
+          <div><label>Date Received</label><input type="date" id="p-received" value="${today}"></div>
+          <div><label>Due Date</label><input type="date" id="p-due"></div>
+        </div>
       </div>
+
+      <div id="p-installment-fields" style="display:none;">
+        <label>Total Amount (₱) — Kabuuang Utang</label>
+        <input type="number" id="p-total" placeholder="0" inputmode="decimal">
+        <label>Payment Frequency — Dalas ng Bayad</label>
+        <select id="p-freq">
+          <option value="daily">Daily — Araw-araw</option>
+          <option value="weekly">Weekly — Lingguhan</option>
+          <option value="monthly" selected>Monthly — Buwanan</option>
+          <option value="annual">Annual — Taunan</option>
+        </select>
+        <div class="row2">
+          <div><label>Start Date</label><input type="date" id="p-start" value="${today}"></div>
+          <div><label># of Payments (optional)</label><input type="number" id="p-periods" placeholder="e.g. 12"></div>
+        </div>
+      </div>
+
       <button class="btn btn-primary" onclick="addPayable()">Save Entry</button>
     </div>
     <div class="section-title">All Utang / Loans</div>
     <div class="card">
       ${rows.length===0 ? `<div class="empty">Wala pang utang na naka-record.</div>` : rows.map(r=>{
         const idx = state.payables.indexOf(r);
-        const overdue = r.status!=="Paid" && r.due && r.due < today;
-        const pillClass = r.status==="Paid" ? "paid" : (overdue?"overdue":"unpaid");
-        const pillText = r.status==="Paid" ? "Paid" : (overdue?"OVERDUE":"Unpaid");
+        const isInstallment = r.type==="Installment";
+        const balance = getPayableBalance(r);
+        const nextDue = isInstallment ? getInstallmentNextDue(r) : r.due;
+        const dLeft = (balance>0 && nextDue) ? daysUntil(nextDue) : null;
+        const overdue = dLeft!==null && dLeft<0;
+        const paidOff = balance<=0;
+        const pillClass = paidOff ? "paid" : (overdue?"overdue":"unpaid");
+        const pillText = paidOff ? "Paid" : (overdue?"OVERDUE":(isInstallment?"Ongoing":"Unpaid"));
         return `<div class="entry">
           <div>
-            <div><b>${escapeHtml(r.name)}</b> <span class="pill ${pillClass}">${pillText}</span></div>
-            <div class="meta">${escapeHtml(r.item||'')} · Due ${r.due||'—'} · by ${r.loggedBy||'-'}</div>
+            <div><b>${escapeHtml(r.name)}</b> <span class="pill ${pillClass}">${pillText}</span> ${isInstallment?`<span class="pill" style="background:var(--brass); color:#fff;">Installment</span>`:''}</div>
+            <div class="meta">${escapeHtml(r.item||'')} · ${isInstallment ? `Next due ${nextDue||'—'}` : `Due ${r.due||'—'}`} · by ${r.loggedBy||'-'}</div>
+            ${isInstallment ? `<div class="meta">Paid ${peso(getInstallmentPaid(r))} of ${peso(r.totalAmt)}</div>` : ''}
           </div>
           <div style="text-align:right;">
-            <div class="amt neg">${peso(r.amt)}</div>
+            <div class="amt neg">${peso(balance)}</div>
             <div style="margin-top:4px; display:flex; gap:6px; justify-content:flex-end;">
-              ${r.status!=="Paid" ? `<button class="btn btn-ghost" style="border-color:var(--good); color:var(--good); padding:5px 10px; font-size:12px;" onclick="markPaid(${idx})">Mark Paid</button>` : ''}
+              ${isInstallment
+                ? (balance>0 ? `<button class="btn btn-ghost" style="border-color:var(--good); color:var(--good); padding:5px 10px; font-size:12px;" onclick="openLoanPaymentModal(${idx})">Log Payment</button>` : '')
+                : (r.status!=="Paid" ? `<button class="btn btn-ghost" style="border-color:var(--good); color:var(--good); padding:5px 10px; font-size:12px;" onclick="markPaid(${idx})">Mark Paid</button>` : '')
+              }
               <button class="del" onclick="delItem('payables', ${idx})">✕</button>
             </div>
           </div>
@@ -1081,18 +1155,42 @@ function renderPayables(){
     </div>
   </main>`;
 }
+function onLoanTypeChange(){
+  const type = document.getElementById('p-type').value;
+  document.getElementById('p-onetime-fields').style.display = type==="One-time" ? "" : "none";
+  document.getElementById('p-installment-fields').style.display = type==="Installment" ? "" : "none";
+}
 function addPayable(){
   const name = document.getElementById('p-name').value.trim();
   if(!name) return;
-  state.payables.push({
-    name,
-    item: document.getElementById('p-item').value.trim(),
-    amt: parseFloat(document.getElementById('p-amt').value)||0,
-    received: document.getElementById('p-received').value,
-    due: document.getElementById('p-due').value,
-    status: "Unpaid",
-    loggedBy: currentUser
-  });
+  const type = document.getElementById('p-type').value;
+  const item = document.getElementById('p-item').value.trim();
+  if(type === "Installment"){
+    const totalAmt = parseFloat(document.getElementById('p-total').value)||0;
+    if(totalAmt<=0){ alert('Please enter a valid total amount.'); return; }
+    state.payables.push({
+      type: "Installment",
+      name,
+      item,
+      totalAmt,
+      frequency: document.getElementById('p-freq').value,
+      startDate: document.getElementById('p-start').value || todayStr(),
+      periods: parseInt(document.getElementById('p-periods').value) || null,
+      history: [],
+      loggedBy: currentUser
+    });
+  } else {
+    state.payables.push({
+      type: "One-time",
+      name,
+      item,
+      amt: parseFloat(document.getElementById('p-amt').value)||0,
+      received: document.getElementById('p-received').value,
+      due: document.getElementById('p-due').value,
+      status: "Unpaid",
+      loggedBy: currentUser
+    });
+  }
   saveState();
   render();
 }
@@ -1101,6 +1199,35 @@ function markPaid(idx){
   if(!ok) return;
   state.payables[idx].status = "Paid";
   saveState();
+  render();
+}
+function openLoanPaymentModal(idx){
+  const p = state.payables[idx];
+  const balance = getPayableBalance(p);
+  const sheet = document.getElementById('item-modal-sheet');
+  sheet.innerHTML = `
+    <div class="modal-title-row"><h3>Log Payment — ${escapeHtml(p.name)}</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+    <p class="subtitle">Balance: ${peso(balance)}</p>
+    <label>Payment Amount (₱)</label>
+    <input type="number" id="lp-amt" placeholder="0" inputmode="decimal">
+    <label>Date</label>
+    <input type="date" id="lp-date" value="${todayStr()}">
+    <button class="btn btn-primary" onclick="submitLoanPayment(${idx})">Save Payment</button>
+    ${(p.history&&p.history.length>0) ? `<div class="section-title" style="margin-top:16px;">Payment History</div>
+      ${[...p.history].reverse().map(h=>`<div class="sumline"><span>${h.date} · ${escapeHtml(h.by||'-')}</span><b>${peso(h.amount)}</b></div>`).join('')}
+    ` : ''}
+  `;
+  document.getElementById('item-modal-overlay').classList.add('open');
+}
+function submitLoanPayment(idx){
+  const p = state.payables[idx];
+  const amount = parseFloat(document.getElementById('lp-amt').value);
+  const date = document.getElementById('lp-date').value || todayStr();
+  if(isNaN(amount) || amount<=0){ alert('Please enter a valid payment amount.'); return; }
+  if(!p.history) p.history = [];
+  p.history.push({date, amount, by: currentUser});
+  saveState();
+  closeItemModal();
   render();
 }
 
@@ -1983,7 +2110,7 @@ function getMonthSummary(sel){
   const opResult = salesIn + feeIn - purchOut;
   const householdTotal = state.household.reduce((s,h)=>s+(Number(h.budget)||0),0);
   const net = opResult - householdTotal;
-  const unpaidTotal = state.payables.filter(p=>p.status!=="Paid").reduce((s,p)=>s+(p.amt||0),0);
+  const unpaidTotal = state.payables.reduce((s,p)=>s+getPayableBalance(p),0);
   return {salesIn, purchOut, feeIn, movedOut, opResult, householdTotal, net, unpaidTotal};
 }
 
@@ -2007,7 +2134,7 @@ function renderSummary(){
   const opResult = salesIn + feeIn - purchOut;
   const householdTotal = state.household.reduce((s,h)=>s+(Number(h.budget)||0),0);
   const net = opResult - householdTotal;
-  const unpaidTotal = state.payables.filter(p=>p.status!=="Paid").reduce((s,p)=>s+(p.amt||0),0);
+  const unpaidTotal = state.payables.reduce((s,p)=>s+getPayableBalance(p),0);
 
   const monthOptions = buildMonthOptions(sel);
 
