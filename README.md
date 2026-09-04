@@ -4,7 +4,7 @@ A shared, single-file web app for tracking a family sari-sari store's cash flow,
 
 Built collaboratively with Claude (Anthropic), iteratively, feature-by-feature, based on real problems the store's owners hit while using it. There is no build step, no framework, and no local dependencies — it is intentionally simple to keep it maintainable by non-professional developers.
 
-**Current version: `v25.0.0`** (shown at the bottom of the sidebar, from the `APP_VERSION` constant near the top of the script).
+**Current version: `v27.1.0`** (shown at the bottom of the sidebar, from the `APP_VERSION` constant near the top of the script).
 
 ## Who this is for
 
@@ -50,19 +50,24 @@ The entire app is built around keeping four types of money **strictly separate**
 
 **Any new feature must respect this separation.** If you're not sure which pot a transaction belongs to, ask before writing it to `dailyLogs`.
 
+Note: Consignment loan accruals (debt that builds up automatically as linked Inventory items sell) live entirely in `payables` and never touch `dailyLogs` or any pot total on their own — same as how a One-time or Installment loan's balance was already independent of the pots. Only an actual cash movement (e.g. logging a remittance, or a manual "Stock Purchases Out" entry) should ever touch a pot.
+
 ## Features
 
 - **Store Health** (default view) — monthly Revenue/Expenses/Profit/Net, a PROFITABLE/NEEDS ATTENTION verdict stamp, and the "Data Tools" panel (Word/text export, full-state JSON export, per-table JSON export, JSON import, Reset, Read-only toggle).
 - **Today's Entry** — daily Sales/Purchases/GCash Fee/Household Draw log.
 - **GCash** — float tracking, separate from store purchases.
 - **Household Budget** — editable categories with `+ Add` / `− Fix` (avoids retyping totals), full audit history behind a separate passkey.
-- **Utang / Loans (Payables)** — supplier/lender debts with due dates and paid status.
+- **Utang / Loans (Payables)** — three loan types under one screen:
+  - **One-time** — a lump amount with a due date, marked Paid when settled.
+  - **Installment** — a total amount paid off over a daily/weekly/monthly/annual schedule, with partial payments logged against a running balance and a schedule-aware next-due date.
+  - **Consignment** — auto-linked to specific Inventory products; the store owes nothing for goods on the shelf, only for units actually sold (debt accrues automatically when a linked item is marked Sold), with an optional per-agreement setting to also charge for spoilage. Remittances are logged manually against the running balance. Tied to the linked supplier's existing visit schedule rather than its own due date.
 - **Expansion (Stall)** — fully separate spending log for the family's second business.
-- **Inventory** — full product records: category, storage type, counting unit, product code (auto-generated), expiry tracking, stock value, days-of-stock-remaining estimate, and **composite products** (e.g. Rim → Pack → Stick, arbitrary nesting depth, independent pricing per level, per-level sale eligibility).
+- **Inventory** — full product records: category, storage type, counting unit, product code (auto-generated), expiry tracking, stock value, days-of-stock-remaining estimate, and **composite products** (e.g. Rim → Pack → Stick, arbitrary nesting depth, independent pricing per level, per-level sale eligibility). A product can also hold **mixed owned + consignment stock** at once when linked to a Consignment loan — Restock lets you tag a batch as Owned or Consignment, and Sold/Spoiled draws down consignment stock first, automatically.
 - **Suppliers** — directory with visit schedules (Fixed Day / Irregular / Canvass Only) and per-item price history with change alerts.
 - **Insights** — Revenue/Expenses/Profit line chart, household spending pie chart, expansion cumulative spend chart, daily/category rankings, and an Inventory Health Matrix (ABC value tier × Fast/Slow/Dead movement, with GMROI).
 - **Help & Tips** — an in-app, bilingual explainer of the PIN/name flow, the three money pots, and how to use each tool — the reference for tone when writing new user-facing copy.
-- **Notification bell** — unified alerts (low stock, expiring soon, unpaid loans, price changes, suppliers scheduled today) — replaces scattered per-tile badges.
+- **Notification bell** — unified alerts: low stock, expiring soon, price changes, suppliers scheduled today, and a *missed or pending daily entry* reminder (silent if today's already logged; nudges after 6 PM if only today is missing; always flags if a full day or more was skipped). Loan alerts are schedule-aware per type — Installment and Consignment only surface when actually due soon or overdue, rather than showing "unpaid" for the entire life of the loan. Replaces scattered per-tile badges.
 - **Access:** a shared family PIN (remembered per device) plus a per-device username system (for attribution on entries, not real security).
 
 ### Data safety tools
@@ -74,6 +79,7 @@ Beyond the original export/reset tools, the app now includes:
 - **Per-table export** — export just one table (Daily Entries, Inventory, etc.) as JSON.
 - **Import from file** — overwrite the live state from a previously exported JSON file. Always takes an automatic backup export first and requires confirmation; disabled while read-only mode is on.
 - **Undo** — destructive actions (deleting a row, a household category, a history entry, or doing a full Reset) push a 30-second-expiring undo entry, surfaced as an undo button, so an accidental tap isn't unrecoverable.
+- **Save-conflict warning** — since all data lives in one shared Supabase row, two devices saving at nearly the same time could otherwise silently overwrite each other. Each save now checks whether another device has saved since this device last loaded, and asks for confirmation before overwriting if so. It's a warn-and-let-you-decide safeguard, not automatic merging — genuinely simultaneous edits still need a human to reconcile.
 
 ## Data model
 
@@ -89,6 +95,10 @@ state = {
 
 When adding a new field to an existing record type, always update the migration function (`ensureInventoryFields()`) to backfill defaults for existing data — never assume a field exists on old records. For a migration that transforms or removes data on existing records (not just backfilling a default), use `runReversibleMigration()` instead so the change is snapshotted and undoable.
 
+Two additions worth knowing about:
+- **`payables` records carry a `type`** (`One-time` / `Installment` / `Consignment`), with different fields per type and a shared `history[]` ledger for anything beyond a single-payment loan. See `AI_INSTRUCTIONS.md`'s "Loan Management" section for the exact shape of each.
+- **`inventory` records carry a `consignmentStock`** — the portion of that item's current stock that's on consignment (owed, not yet paid for) rather than store-owned. A small `_meta` object (`lastSavedAt`, `lastSavedBy`) also rides inside the top-level `state` blob itself, used only for the save-conflict check above — it's not tied to any one table.
+
 ## Versioning policy
 
 Documented format: **`vMAJOR.CLEAN.MINOR`**
@@ -96,7 +106,7 @@ Documented format: **`vMAJOR.CLEAN.MINOR`**
 - **CLEAN** — bug fixes, cleanup (resets MINOR to 0)
 - **MINOR** — small tweaks, label changes, small field additions
 
-**Note:** in current practice, `APP_VERSION` has been tracked as a single incrementing number (currently `v25.0.0`) rather than the three-part scheme above. The policy is documented here as originally intended; if you're deciding how to bump the version for a new change, confirm with the developer whether to continue the single-number scheme or return to `MAJOR.CLEAN.MINOR`, and update this section once that's settled.
+**Note:** the three-part scheme fell out of use for a while (`APP_VERSION` sat at a single incrementing number, `v25.0.0`, for several releases) but has been back in active use since the Loan Management work: `v26.0.0` → `v26.1.0` → `v27.0.0` → `v27.1.0`, each bump matching the MAJOR/CLEAN/MINOR definitions above. Keep following it going forward — new data model or new tab = MAJOR, bug fix = CLEAN, small additive tweak = MINOR.
 
 The current version lives in the `APP_VERSION` constant near the top of the script, and is shown at the bottom of the sidebar.
 
