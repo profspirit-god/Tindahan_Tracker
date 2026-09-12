@@ -411,7 +411,7 @@ const CATEGORY_PREFIX = {
 const SCHEDULE_TYPES = ["Fixed Day","Irregular","Canvass Only"];
 const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-const APP_VERSION = "v27.3.0"; // bump this by hand with each future commit
+const APP_VERSION = "v27.4.0"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -449,6 +449,11 @@ function getLastDailyLogDate(){
   if(!state.dailyLogs || state.dailyLogs.length===0) return null;
   return state.dailyLogs.reduce((max,r)=> (r.date && r.date>max) ? r.date : max, state.dailyLogs[0].date||"");
 }
+const NOTIF_ICONS = {
+  'Low Stock':'📦', 'Expiring Soon':'⏳', 'Unpaid Loan':'📒',
+  'Price Alert':'💰', 'Supplier Today':'🚚', 'No Entry':'📝'
+};
+let notifExpandedGroups = {};
 function getNotifications(){
   const notifs = [];
   state.inventory.filter(r=>Number(r.stock)<=Number(r.reorder)).forEach(r=>
@@ -501,12 +506,26 @@ function openNotifPanel(){
   const sheet = document.getElementById('item-modal-sheet');
   sheet.innerHTML = `
     <div class="modal-title-row"><h3>🔔 Notices</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
-    ${notifs.length===0 ? `<div class="empty">Walang bagong notice.</div>` : Object.keys(groups).map(type=>`
-      <div class="section-title" style="margin-top:12px; font-size:15px;">${type} (${groups[type].length})</div>
-      ${groups[type].map(n=>`<div class="entry"><div>${escapeHtml(n.text)}</div>${n.type==='Price Alert' ? `<button class="del" onclick="ackPriceAlert(${n.alertIdx})">✓</button>` : ''}</div>`).join('')}
-    `).join('')}
+    ${notifs.length===0 ? `<div class="empty">Walang bagong notice.</div>` : Object.keys(groups).map(type=>{
+      const isOpen = !!notifExpandedGroups[type];
+      const icon = NOTIF_ICONS[type] || '🔔';
+      return `<div class="item-row" style="margin-bottom:8px;">
+        <div class="item-row-head" onclick="toggleNotifGroup('${type}')">
+          <div><b>${icon} ${type}</b> <span class="code-badge">${groups[type].length}</span></div>
+          <span class="chevron ${isOpen?'open':''}">▶</span>
+        </div>
+        ${isOpen ? `<div class="item-row-body">
+          ${groups[type].map(n=>`<div class="entry"><div>${escapeHtml(n.text)}</div>${n.type==='Price Alert' ? `<button class="del" onclick="ackPriceAlert(${n.alertIdx})">✓</button>` : ''}</div>`).join('')}
+        </div>` : ''}
+      </div>`;
+    }).join('')}
   `;
   document.getElementById('item-modal-overlay').classList.add('open');
+}
+
+function toggleNotifGroup(type){
+  notifExpandedGroups[type] = !notifExpandedGroups[type];
+  openNotifPanel();
 }
 
 function ackPriceAlert(idx){
