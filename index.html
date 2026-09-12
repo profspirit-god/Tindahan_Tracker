@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tindahan Tracker</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
@@ -34,12 +34,14 @@
     font-family:'Inter', system-ui, sans-serif;
     color:var(--ink);
     min-height:100vh;
+    min-height:100dvh; /* dvh accounts for mobile browser chrome; vh is the fallback */
     font-size:17px;
   }
   #app{
     max-width:520px;
     margin:0 auto;
     min-height:100vh;
+    min-height:100dvh;
     background:var(--page);
     position:relative;
     padding-bottom:40px;
@@ -252,13 +254,13 @@
   <div id="lock-error"></div>
   <button id="lock-btn" onclick="checkPin()">Unlock</button>
 </div>
-<button id="hamburger-btn" onclick="toggleSidebar()">☰</button>
-<button id="notif-btn" onclick="openNotifPanel()">🔔<span id="notif-badge" class="notif-badge"></span></button>
-<button id="undo-btn" onclick="undoLast()" style="display:none; position:fixed; top:14px; right:70px; z-index:30; background:var(--cover); color:#fff; border:none; width:42px; height:42px; border-radius:10px; font-size:18px; box-shadow:0 2px 8px rgba(0,0,0,.3);">↶</button>
+<button id="hamburger-btn" onclick="toggleSidebar()" aria-label="Open menu">☰</button>
+<button id="notif-btn" onclick="openNotifPanel()" aria-label="Notifications">🔔<span id="notif-badge" class="notif-badge"></span></button>
+<button id="undo-btn" onclick="undoLast()" aria-label="Undo last action" style="display:none; position:fixed; top:14px; right:70px; z-index:30; background:var(--cover); color:#fff; border:none; width:42px; height:42px; border-radius:10px; font-size:18px; box-shadow:0 2px 8px rgba(0,0,0,.3);">↶</button>
 <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
 <div id="sidebar"></div>
 <div id="app-shell">
-  <div id="offline-banner" style="display:none; background:#FDE68A; color:#92400E; text-align:center; padding:8px; font-size:13px; font-weight:600; border-bottom: 2px solid #D97706;">
+  <div id="offline-banner" role="status" aria-live="polite" style="display:none; background:#FDE68A; color:#92400E; text-align:center; padding:8px; font-size:13px; font-weight:600; border-bottom: 2px solid #D97706;"></div>
     ⚠️ Offline: Changes are saved to this device and will sync when you reconnect.
   </div>
   <div id="app"></div>
@@ -408,7 +410,7 @@ const CATEGORY_PREFIX = {
 const SCHEDULE_TYPES = ["Fixed Day","Irregular","Canvass Only"];
 const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-const APP_VERSION = "v28.2.2"; // bump this by hand with each future commit
+const APP_VERSION = "v28.2.3"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -2774,6 +2776,35 @@ function escapeHtml(s){
 }
 function attachHandlers(){ /* all handlers are inline via onclick for simplicity/reliability */ }
 
+// --- Inactivity auto-lock (v28.2.3) ---
+// Shared family phones get left unlocked on the counter; the PIN must re-engage.
+const INACTIVITY_LOCK_MS = 15 * 60 * 1000; // 15 minutes of zero interaction
+let inactivityTimer = null;
+
+function lockAppForInactivity(){
+  const ls = document.getElementById('lock-screen');
+  if(ls && ls.style.display !== 'none') return; // already on the lock screen
+  localStorage.removeItem('storeUnlocked');
+  ls.style.display = 'flex';
+  const li = document.getElementById('lock-input');
+  if(li) li.value = '';
+  const le = document.getElementById('lock-error');
+  if(le) le.textContent = 'Auto-locked after inactivity — enter the PIN again.';
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+  document.getElementById('item-modal-overlay').classList.remove('open');
+  document.getElementById('chart-modal').classList.remove('open');
+}
+
+function resetInactivityTimer(){
+  if(inactivityTimer) clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(lockAppForInactivity, INACTIVITY_LOCK_MS);
+}
+
+['touchstart','click','keydown','scroll'].forEach(evt=>{
+  document.addEventListener(evt, resetInactivityTimer, {passive:true});
+});
+
 function startApp(){
   (async function(){
     render ();
@@ -2788,10 +2819,14 @@ function startApp(){
     ensureUsername();
     render();
     startAutoRefresh();
+    resetInactivityTimer();
   })();
 }
 
+let autoRefreshStarted = false;
 function startAutoRefresh(){
+  if(autoRefreshStarted) return; // guard: startApp() runs again after each auto-lock unlock
+  autoRefreshStarted = true;
   setInterval(async ()=>{
     if(view !== "home" && view !== "summary") return;
     const before = JSON.stringify(state);
