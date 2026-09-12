@@ -45,9 +45,9 @@ Every entry in `state.payables` has a `type`. Existing entries without one defau
 
 | | `"One-time"` | `"Installment"` | `"Consignment"` |
 |---|---|---|---|
-| Fields | `amt`, `due`, `status` (`"Unpaid"`/`"Paid"`) | `totalAmt`, `frequency` (`daily`/`weekly`/`monthly`/`annual`), `startDate`, `periods` (optional), `history[]` | `linkedItemIds[]` (Inventory `.code` values), `chargeForSpoilage` (bool), `history[]` |
-| Balance | `getPayableBalance(p)` → `p.status==="Paid" ? 0 : p.amt` | `getPayableBalance(p)` → `totalAmt − getInstallmentPaid(p)` | `getPayableBalance(p)` → `getConsignmentBalance(p)` (accruals − remittances) |
-| `history[]` entries | n/a | `{date, amount, by, kind:'remittance'}` — manual only | `{date, amount, by, kind}` where `kind` is `'sale-accrual'` / `'spoilage-accrual'` (both auto-logged from `applyStockDelta()`) or `'remittance'` (manual, via the shared payment modal) |
+| Fields | `amt`, `due`, `status` (`"Unpaid"`/`"Paid"`), `history[]` (partial payments, as of v28.2.2) | `totalAmt`, `frequency` (`daily`/`weekly`/`monthly`/`annual`), `startDate`, `periods` (optional), `history[]` | `linkedItemIds[]` (Inventory `.code` values), `chargeForSpoilage` (bool), `history[]` |
+| Balance | `getPayableBalance(p)` → `p.status==="Paid" ? 0 : max(0, amt − getInstallmentPaid(p))` | `getPayableBalance(p)` → `totalAmt − getInstallmentPaid(p)` | `getPayableBalance(p)` → `getConsignmentBalance(p)` (accruals − remittances) |
+| `history[]` entries | `{date, amount, by, kind:'payment'}` — manual via shared payment modal; auto-sets `status:"Paid"` when balance hits 0 | `{date, amount, by, kind:'remittance'}` — manual only | `{date, amount, by, kind}` where `kind` is `'sale-accrual'` / `'spoilage-accrual'` (both auto-logged from `applyStockDelta()`) or `'remittance'` (manual, via the shared payment modal) |
 | Next due | `p.due` directly | `getInstallmentNextDue(p)` — pure calendar math off `startDate + frequency`, independent of payment progress | `getConsignmentNextDue(p)` — looks up the linked supplier (`state.suppliers.find(s=>s.name===p.name)`) and only resolves a date for `scheduleType==="Fixed Day"`; returns `null` for Irregular/Canvass-Only (handled as an always-on notification instead) |
 | Logging a payment | `markPaid(idx)` — binary | `openLoanPaymentModal(idx)` → `submitLoanPayment(idx)`, shared with Consignment | same shared modal, labeled "Log Remittance" instead of "Log Payment" when `type==="Consignment"` |
 
