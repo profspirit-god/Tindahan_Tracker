@@ -411,7 +411,7 @@ const CATEGORY_PREFIX = {
 const SCHEDULE_TYPES = ["Fixed Day","Irregular","Canvass Only"];
 const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-const APP_VERSION = "v27.2.0"; // bump this by hand with each future commit
+const APP_VERSION = "v27.3.0"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -1000,8 +1000,9 @@ function renderDaily(){
     <div class="card">
       <label>Date / Petsa</label>
       <input type="date" id="d-date" value="${todayStr()}">
-      <label>Sales Cash In (₱) — Benta</label>
-      <input type="number" id="d-sales" placeholder="0" inputmode="decimal">
+      <label>Ending Cash Counted (₱) — Natitirang Pera sa Kahon</label>
+      <input type="number" id="d-ending" placeholder="0" inputmode="decimal">
+      <p class="subtitle" style="margin:2px 0 10px;">Count what's physically in the drawer at closing. Sales will be calculated automatically — don't type sales directly.</p>
       <label>Stock Purchases Out (₱) — Pambili ng Paninda</label>
       <input type="number" id="d-purch" placeholder="0" inputmode="decimal">
       <label>GCash Fee Earned (₱) — Kita sa GCash</label>
@@ -1019,7 +1020,7 @@ function renderDaily(){
         const net = (r.salesIn||0) + (r.fee||0) - (r.purchOut||0) - (r.movedDraw||0);
         return `<div class="entry">
           <div>
-            <div><b>${r.date}</b>${balanceNote}</div>
+            <div class="meta">Sales ${peso(r.salesIn)} (Ending Cash: ${peso(r.enteredEndingCash)}) · Bought ${peso(r.purchOut)} · GCash ${peso(r.fee)} · To home ${peso(r.movedDraw)} · by ${r.loggedBy||'-'}</div>
             <div class="meta">Sales ${peso(r.salesIn)} · Bought ${peso(r.purchOut)} · GCash ${peso(r.fee)} · To home ${peso(r.movedDraw)} · by ${r.loggedBy||'-'}</div>
           </div>
           <div style="text-align:right;">
@@ -1033,12 +1034,18 @@ function renderDaily(){
 }
 function addDaily(){
   const date = document.getElementById('d-date').value || todayStr();
+  const endingCash = parseFloat(document.getElementById('d-ending').value)||0;
+  const purchOut = parseFloat(document.getElementById('d-purch').value)||0;
+  const fee = parseFloat(document.getElementById('d-fee').value)||0;
+  const movedDraw = parseFloat(document.getElementById('d-draw').value)||0;
+  const salesIn = endingCash + purchOut + movedDraw; // drawer starts at 0 each day, so this reconstructs true Sales
   const entry = {
     date,
-    salesIn: parseFloat(document.getElementById('d-sales').value)||0,
-    purchOut: parseFloat(document.getElementById('d-purch').value)||0,
-    fee: parseFloat(document.getElementById('d-fee').value)||0,
-    movedDraw: parseFloat(document.getElementById('d-draw').value)||0,
+    salesIn,
+    enteredEndingCash: endingCash,
+    purchOut,
+    fee,
+    movedDraw,
     notes: document.getElementById('d-notes').value.trim(),
     loggedBy: currentUser
   };
