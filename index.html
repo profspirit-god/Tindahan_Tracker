@@ -258,6 +258,9 @@
 <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
 <div id="sidebar"></div>
 <div id="app-shell">
+  <div id="offline-banner" style="display:none; background:#FDE68A; color:#92400E; text-align:center; padding:8px; font-size:13px; font-weight:600; border-bottom: 2px solid #D97706;">
+    ⚠️ Offline: Changes are saved to this device and will sync when you reconnect.
+  </div>
   <div id="app"></div>
 </div>
 
@@ -405,7 +408,7 @@ const CATEGORY_PREFIX = {
 const SCHEDULE_TYPES = ["Fixed Day","Irregular","Canvass Only"];
 const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-const APP_VERSION = "v28.1.0"; // bump this by hand with each future commit
+const APP_VERSION = "v28.8.0"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -596,6 +599,67 @@ let invPageSize = "20";
 let invLowStockOnly = false;
 let stockHistPageSize = "20";
 
+const OFFLINE_QUEUE_KEY = 'tindahan-offline-queue';
+let isOfflineMode = false;
+
+function showOfflineBanner(show) {
+    const banner = document.getElementById('offline-banner');
+    if(banner) banner.style.display = show ? 'block' : 'none';
+}
+
+window.addEventListener('online', () => {
+    if(isOfflineMode) {
+        isOfflineMode = false;
+        showOfflineBanner(false);
+        processOfflineQueue();
+    }
+});
+
+window.addEventListener('offline', () => {
+    isOfflineMode = true;
+    showOfflineBanner(true);
+});
+
+async function processOfflineQueue() {
+    const queued = localStorage.getItem(OFFLINE_QUEUE_KEY);
+    if(!queued) return;
+    
+    try {
+        const pendingState = JSON.parse(queued);
+        // Basic conflict check: if server has newer data, warn user
+        const { data: current } = await sb.from("app_state").select("data").eq("id", 1).single();
+        const serverSavedAt = current?.data?._meta?.lastSavedAt;
+        const queueSavedAt = pendingState._meta?.lastSavedAt;
+        
+        if(serverSavedAt && queueSavedAt && serverSavedAt > queueSavedAt) {
+            const proceed = confirm("⚠️ Data conflict!\n\nSomeone updated the data online while this device was offline.\n\nOK = Overwrite server with this device's offline changes.\nCancel = Discard offline changes and fetch server data.");
+            if(!proceed) {
+                localStorage.removeItem(OFFLINE_QUEUE_KEY);
+                await quickRefresh();
+                return;
+            }
+        }
+        
+        // Push to server
+        const now = new Date().toISOString();
+        pendingState._meta = { lastSavedAt: now, lastSavedBy: currentUser };
+        
+        const { error } = await sb.from("app_state").update({ data: pendingState }).eq("id", 1);
+        if(!error) {
+            localStorage.removeItem(OFFLINE_QUEUE_KEY);
+            state = pendingState;
+            lastKnownSavedAt = now;
+            syncStatus = "ok";
+            render();
+            console.log("Offline queue successfully synced.");
+        } else {
+            console.error("Failed to sync offline queue", error);
+        }
+    } catch(e) {
+        console.error("Error processing offline queue", e);
+    }
+}
+
 function peso(n){
   n = Number(n)||0;
   const neg = n < 0;
@@ -619,21 +683,32 @@ function el(html){
 }
 
 async function loadState(){
-  const { data, error} = await sb
-    .from("app_state")
-    .select("data")
-    .eq("id", 1)
-    .single();
+  // If offline and we have a queue, use the queue so the app still works!
+  if(!navigator.onLine && localStorage.getItem(OFFLINE_QUEUE_KEY)) {
+      try {
+          state = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY));
+          syncStatus = "offline";
+          showOfflineBanner(true);
+          loaded = true;
+          return;
+      } catch(e) { console.warn("Failed to parse offline queue", e); }
+  }
 
-  if (!error && data.data) {
-    state = Object.assign(state, data.data);
-    if (!state.household || state.household.length === 0) {
-      state.household = DEFAULT_HOUSEHOLD.map(h => ({ ...h }));
-    }
-    lastKnownSavedAt = (state._meta && state._meta.lastSavedAt) || null;
-    syncStatus = "ok";
-  } else {
-    syncStatus = "error";
+  try {
+      const { data, error} = await sb.from("app_state").select("data").eq("id", 1).single();
+      if (!error && data.data) {
+        state = Object.assign(state, data.data);
+        if (!state.household || state.household.length === 0) {
+          state.household = DEFAULT_HOUSEHOLD.map(h => ({ ...h }));
+        }
+        lastKnownSavedAt = (state._meta && state._meta.lastSavedAt) || null;
+        syncStatus = "ok";
+      } else {
+        syncStatus = "error";
+      }
+  } catch(e) {
+      console.warn("Load failed, likely offline.", e);
+      syncStatus = "error";
   }
   loaded = true;
 }
@@ -646,29 +721,53 @@ async function saveState(){
     syncStatus = "readonly";
     return;
   }
-  if(lastKnownSavedAt){
-    const { data: current } = await sb
-      .from("app_state")
-      .select("data")
-      .eq("id", 1)
-      .single();
-    const serverSavedAt = current && current.data && current.data._meta ? current.data._meta.lastSavedAt : null;
-    if(serverSavedAt && serverSavedAt !== lastKnownSavedAt){
-      const proceed = confirm("⚠️ Someone else updated the data on another device since this one last loaded.\n\nSaving now may overwrite their changes.\n\nOK = Save anyway\nCancel = Don't save (refresh the page first to get the latest data)");
-      if(!proceed){
-        syncStatus = "conflict";
-        return;
-      }
-    }
-  }
+  
   const now = new Date().toISOString();
   state._meta = { lastSavedAt: now, lastSavedBy: currentUser };
+
+  // If offline, save to queue immediately
+  if(!navigator.onLine || isOfflineMode) {
+    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(state));
+    syncStatus = "offline";
+    showOfflineBanner(true);
+    return;
+  }
+
+  if(lastKnownSavedAt){
+    try {
+        const { data: current, error } = await sb.from("app_state").select("data").eq("id", 1).single();
+        if(error) throw error;
+        const serverSavedAt = current && current.data && current.data._meta ? current.data._meta.lastSavedAt : null;
+        if(serverSavedAt && serverSavedAt !== lastKnownSavedAt){
+          const proceed = confirm("⚠️ Someone else updated the data on another device since this one last loaded.\n\nSaving now may overwrite their changes.\n\nOK = Save anyway\nCancel = Don't save (refresh the page first to get the latest data)");
+          if(!proceed){
+            syncStatus = "conflict";
+            return;
+          }
+        }
+    } catch(e) {
+        // Network error during conflict check -> queue it
+        console.warn("Network error during save check, queueing offline.", e);
+        localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(state));
+        syncStatus = "offline";
+        showOfflineBanner(true);
+        return;
+    }
+  }
+  
   lastKnownSavedAt = now;
-  const { error } = await sb
-    .from("app_state")
-    .update({ data: state })
-    .eq("id", 1);
-  syncStatus = error ? "error" : "ok";
+  try {
+      const { error } = await sb.from("app_state").update({ data: state }).eq("id", 1);
+      if(error) throw error;
+      syncStatus = "ok";
+      localStorage.removeItem(OFFLINE_QUEUE_KEY); // Clear queue on successful save
+      showOfflineBanner(false);
+  } catch(e) {
+      console.warn("Save failed, queueing offline.", e);
+      localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(state));
+      syncStatus = "offline";
+      showOfflineBanner(true);
+  }
 }
 
 function toggleReadOnly(){
@@ -2661,6 +2760,12 @@ function attachHandlers(){ /* all handlers are inline via onclick for simplicity
 function startApp(){
   (async function(){
     render ();
+    
+    // Process any leftover offline queue before loading fresh state
+    if(localStorage.getItem(OFFLINE_QUEUE_KEY) && navigator.onLine) {
+        await processOfflineQueue();
+    }
+    
     await loadState();
     ensureInventoryFields();
     ensureUsername();
