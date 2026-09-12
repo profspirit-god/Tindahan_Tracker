@@ -5,30 +5,30 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Tindahan Tracker</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
   :root{
-    --cover:#16423C;
-    --cover-dark:#0E2E29;
-    --page:#FFFBF1;
-    --page-line:#E4D9BE;
-    --ink:#2A2521;
-    --ink-soft:#6B6255;
-    --brass:#A9762F;
-    --brass-light:#D9A55C;
-    --teal:#2C6E7F;
-    --teal-dark:#1F4F5C;
-    --good:#2E6B4F;
-    --good-bg:#E4EFE7;
-    --bad:#8C3A32;
-    --bad-bg:#F4E4E1;
-    --radius:16px;
+    --cover:#0A0A0A;
+    --cover-dark:#000000;
+    --page:#FFFFFF;
+    --page-line:#E3E3E3;
+    --ink:#111111;
+    --ink-soft:#6E6E6E;
+    --brass:#111111;
+    --brass-light:#8A8A8A;
+    --teal:#111111;
+    --teal-dark:#000000;
+    --good:#111111;
+    --good-bg:#F0F0F0;
+    --bad:#111111;
+    --bad-bg:#ECECEC;
+    --radius:12px;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
     background:var(--cover);
-    font-family:'Public Sans', system-ui, sans-serif;
+    font-family:'Inter', system-ui, sans-serif;
     color:var(--ink);
     min-height:100vh;
     font-size:17px;
@@ -38,27 +38,20 @@
     margin:0 auto;
     min-height:100vh;
     background:var(--page);
-    background-image: repeating-linear-gradient(var(--page) 0 41px, var(--page-line) 41px 42px);
-    background-attachment:local;
     position:relative;
     padding-bottom:40px;
-  }
-  #app::before{
-    content:"";
-    position:absolute; top:0; bottom:0; left:38px;
-    width:2px; background:var(--bad); opacity:.35;
   }
   #lock-screen{
     position: fixed; inset:0; background: var(--cover); z-index:999;
     display: flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
-    color:var(--page); font-family:'publish Sans', sans-serif; padding:20px; text-align:center;
+    color:var(--page); font-family:'Inter', sans-serif; padding:20px; text-align:center;
   }
-  #lock-screen h2{font-family: 'Zilla Slab', serif; margin:0;}
+  #lock-screen h2{font-family:'Space Grotesk', sans-serif; margin:0;}
   #lock-input{
     font-size:28px; letter-spacing:10px; text-align:center; width:180px;
     padding:12px; border-radius: 12px; border:none;
   }
-  #lock-error{color:#F4A9A0; font-size:13px; height:16px;}
+  #lock-error{color:var(--ink); font-size:13px; height:16px;}
   #lock-btn{
     background:var(--teal); border:none; padding:12px 30px;
     border-radius:12px; font-weight:700; font-size:15px; cursor:pointer;
@@ -66,13 +59,13 @@
   #username-screen{
     position:fixed; inset:0; background:var(--cover); z-index:998;
     display:none; flex-direction:column; align-items:center; justify-content:center; gap:14px;
-    color:var(--page); font-family: 'Public Sans', sana-serif; margin:0;}
-  #username-screen h2{font-family: 'Zilla Slab', serif; margin:0;}
+    color:var(--page); font-family: 'Inter', sans-serif; margin:0;}
+  #username-screen h2{font-family:'Space Grotesk', sans-serif; margin:0;}
   #username-input{
     font-size:20px; text-align:center; width:220px;
     padding:12px; border-radius:12px; border:none;
   }
-  #username-error{color:#F4A9A0; font-size:13px; min-height:16px;}
+  #username-error{color:var(--ink); font-size:13px; min-height:16px;}
   #username-claim{background:none; border:none; color:var(--brass-light); text-decoration:underline; font-size:12.5px; cursor:pointer;}
  
   header.top{
@@ -84,7 +77,7 @@
     box-shadow:0 3px 10px rgba(0,0,0,.25);
   }
   header.top h1{
-    font-family:'Zilla Slab', serif;
+    font-family:'Space Grotesk', sans-serif;
     font-size:26px; margin:0; letter-spacing:.3px;
   }
   header.top p{margin:4px 0 0; font-size:13px; color:var(--brass-light); font-weight:500;}
@@ -100,12 +93,12 @@
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
     transition:transform .12s ease;
   }
-  .tile:active{transform:scale(.96); background:#FCF3DF;}
+  .tile:active{transform:scale(.96); background:var(--page-line);}
   .tile .ic{font-size:30px;}
-  .tile .en{font-family:'Zilla Slab', serif; font-weight:600; font-size:16px; line-height:1.2;}
+  .tile .en{font-family:'Space Grotesk', sans-serif; font-weight:600; font-size:16px; line-height:1.2;}
   .tile .fil{font-size:12.5px; color:var(--ink-soft);}
   .section-title{
-    font-family:'Zilla Slab', serif; font-size:21px; font-weight:600; margin:2px 0 4px;
+    font-family:'Space Grotesk', sans-serif; font-size:21px; font-weight:600; margin:2px 0 4px;
     color:var(--cover-dark);
   }
   .subtitle{font-size:13.5px; color:var(--ink-soft); margin:0 0 14px;}
@@ -135,39 +128,39 @@
   .entry:last-child{border-bottom:none;}
   .entry .meta{font-size:12.5px; color:var(--ink-soft); margin-top:2px;}
   .entry .amt{font-weight:700; white-space:nowrap;}
-  .amt.pos{color:var(--good);}
-  .amt.neg{color:var(--bad);}
+  .amt.pos::before{content:'▲ ';}
+  .amt.neg::before{content:'▼ ';}
   .pill{
     display:inline-block; font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:20px;
     margin-left:6px;
   }
-  .pill.paid{background:var(--good-bg); color:var(--good);}
-  .pill.unpaid{background:var(--bad-bg); color:var(--bad);}
-  .pill.overdue{background:var(--bad); color:#fff;}
+  .pill.paid{background:var(--good-bg); color:var(--ink-soft);}
+  .pill.unpaid{background:#fff; color:var(--ink); border:1px solid var(--ink);}
+  .pill.overdue{background:var(--ink); color:#fff;}
   .del{background:none; border:none; color:var(--ink-soft); font-size:18px; cursor:pointer; padding:2px 6px;}
   .stamp{
     border:3px solid; border-radius:14px; padding:14px 10px; text-align:center;
-    font-family:'Zilla Slab', serif; font-weight:700; font-size:18px; letter-spacing:1px;
+    font-family:'Space Grotesk', sans-serif; font-weight:700; font-size:18px; letter-spacing:1px;
     transform:rotate(-2deg); margin:16px 0;
   }
-  .stamp.good{border-color:var(--good); color:var(--good); background:var(--good-bg);}
-  .stamp.bad{border-color:var(--bad); color:var(--bad); background:var(--bad-bg);}
+  .stamp.good{border-color:var(--ink); color:#fff; background:var(--ink);}
+  .stamp.bad{border-color:var(--ink); color:var(--ink); background:#fff; border-style:dashed;}
   .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .sumline{display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px dashed var(--page-line); font-size:15px;}
   .sumline:last-child{border:none;}
   .sumline b{font-weight:700;}
   .tip{
-    background:#FCF3DF; border-left:4px solid var(--brass); padding:12px 14px; border-radius:8px;
+    background:var(--page-line); border-left:4px solid var(--brass); padding:12px 14px; border-radius:8px;
     margin-bottom:10px; font-size:14.5px; line-height:1.5;
   }
-  .help-h{font-family:'Zilla Slab', serif; font-weight:600; font-size:16.5px; color:var(--teal-dark); margin:18px 0 6px;}
+  .help-h{font-family:'Space Grotesk', sans-serif; font-weight:600; font-size:16.5px; color:var(--teal-dark); margin:18px 0 6px;}
   .help-p{font-size:14.5px; line-height:1.6; margin:0 0 8px; color:var(--ink);}
   .empty{text-align:center; color:var(--ink-soft); font-size:14px; padding:20px 0;}
   select{appearance:auto;}
   .field-inline{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0;}
   .field-inline input{width:110px; text-align:right;}
   .banner{
-    font-size:12.5px; background:#FCF3DF; border:1px solid var(--brass-light); color:var(--ink-soft);
+    font-size:12.5px; background:var(--page-line); border:1px solid var(--brass-light); color:var(--ink-soft);
     padding:8px 12px; border-radius:10px; margin-bottom:14px;
   }
 
@@ -177,7 +170,7 @@
 }
 #chart-modal.open{display:flex;}
 #chart-modal .modal-header{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;}
-#chart-modal .modal-header h3{color:#fff; font-family:'Zilla Slab',serif; margin:0; font-size:18px;}
+#chart-modal .modal-header h3{color:#fff; font-family:'Space Grotesk', sans-serif; margin:0; font-size:18px;}
 #chart-modal .modal-close{background:var(--bad); color:#fff; border:none; width:38px; height:38px; border-radius:10px; font-size:20px;}
 #chart-modal .modal-body{flex:1; background:#fff; border-radius:14px; padding:16px; display:flex; align-items:center;}
 
@@ -185,7 +178,7 @@
 .search-row input{flex:1;}
 .filter-row{display:flex; gap:8px; margin-bottom:14px;}
 .filter-row select{flex:1; font-size:13px; padding:9px;}
-.code-badge{font-size:11px; font-weight:700; background:#EFE6CE; color:var(--brass); padding:2px 8px; border-radius:6px; margin-left:6px;}
+.code-badge{font-size:11px; font-weight:700; background:var(--page-line); color:var(--ink); padding:2px 8px; border-radius:6px; margin-left:6px;}
 .item-row{background:#fff; border:1px solid var(--page-line); border-radius:12px; margin-bottom:10px; overflow:hidden;}
 .item-row-head{padding:12px 14px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;}
 .item-row-body{padding:0 14px 14px; border-top:1px dashed var(--page-line);}
@@ -232,7 +225,7 @@
   border-radius:20px 20px 0 0; padding:20px 20px 28px;
 }
 .modal-title-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
-.modal-title-row h3{ font-family:'Zilla Slab',serif; margin:0; color:var(--cover-dark); font-size:19px; }
+.modal-title-row h3{ font-family:'Space Grotesk', sans-serif; margin:0; color:var(--cover-dark); font-size:19px; }
 .modal-x{ background:var(--page-line); border:none; width:34px; height:34px; border-radius:10px; font-size:16px; color:var(--ink); }
 
 #notif-btn{
@@ -411,7 +404,7 @@ const CATEGORY_PREFIX = {
 const SCHEDULE_TYPES = ["Fixed Day","Irregular","Canvass Only"];
 const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-const APP_VERSION = "v27.4.0"; // bump this by hand with each future commit
+const APP_VERSION = "v28.0.0"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -855,7 +848,7 @@ function header(title, filTitle){
 function render(){
   const app = document.getElementById('app');
   if(!loaded){
-    app.innerHTML = `<div style="padding:40px;text-align:center;color:#6B6255;">Loading…</div>`;
+    app.innerHTML = `<div style="padding:40px;text-align:center;color:var(--ink-soft);">Loading…</div>`;
     return;
   }
   let html = "";
@@ -1039,8 +1032,8 @@ function renderDaily(){
         const net = (r.salesIn||0) + (r.fee||0) - (r.purchOut||0) - (r.movedDraw||0);
         return `<div class="entry">
           <div>
+            <div><b>${r.date}</b>${balanceNote}</div>
             <div class="meta">Sales ${peso(r.salesIn)} (Ending Cash: ${peso(r.enteredEndingCash)}) · Bought ${peso(r.purchOut)} · GCash ${peso(r.fee)} · To home ${peso(r.movedDraw)} · by ${r.loggedBy||'-'}</div>
-            <div class="meta">Sales ${peso(r.salesIn)} · Bought ${peso(r.purchOut)} · GCash ${peso(r.fee)} · To home ${peso(r.movedDraw)} · by ${r.loggedBy||'-'}</div>
           </div>
           <div style="text-align:right;">
             <div class="amt ${net>=0?'pos':'neg'}">${peso(net)}</div>
@@ -1677,8 +1670,8 @@ function renderInventory(){
       <div class="sumline"><span>Potential Margin if All Sold</span><b class="amt pos">${peso(val.saleValue - val.costValue)}</b></div>
     </div>
 
-    ${soon.length>0 ? `<div class="card" style="border:1.5px solid #7A4E00; background:#FCF3DF;">
-      <b style="color:#7A4E00;">⚠️ Expiring within 7 days (${soon.length})</b>
+    ${soon.length>0 ? `<div class="card" style="border:1.5px dashed var(--ink); background:#fff;">
+      <b style="color:var(--ink);">⚠️ Expiring within 7 days (${soon.length})</b>
       ${soon.sort((a,b)=>daysUntil(a.expiryDate)-daysUntil(b.expiryDate)).map(r=>
         `<div class="sumline"><span>${escapeHtml(r.name)}</span><b>${daysUntil(r.expiryDate)<0?'EXPIRED':daysUntil(r.expiryDate)+'d left'}</b></div>`
       ).join('')}
@@ -1720,7 +1713,7 @@ function renderInventory(){
       return `<div class="item-row">
         <div class="item-row-head" onclick="toggleExpand(${r._idx})">
           <div>
-            <b>${escapeHtml(r.name)}</b><span class="code-badge">${r.code}</span> ${low?`<span class="pill overdue">LOW</span>`:''} ${(dLeft!==null && dLeft<=7) ? `<span class="pill overdue" style="background:#F4D9A0; color:#7A4E00;">${dLeft<0?'EXPIRED':'EXPIRING'}</span>` : ''}
+            <b>${escapeHtml(r.name)}</b><span class="code-badge">${r.code}</span> ${low?`<span class="pill overdue">LOW</span>`:''} ${(dLeft!==null && dLeft<=7) ? `<span class="pill overdue" style="background:var(--ink); color:#fff; border:1px dashed #fff;">${dLeft<0?'EXPIRED':'EXPIRING'}</span>` : ''}
             <div class="meta">Stock: ${r.isComposite ? breakdownStock(r) : `${r.stock} ${r.unit}`} · ${r.category}</div>
           </div>
           <span class="chevron ${isOpen?'open':''}">▶</span>
@@ -1748,7 +1741,7 @@ function renderInventory(){
             <button class="btn" style="flex:1; background:var(--teal); color:#fff; padding:9px; font-size:13px;" onclick="restockItem(${r._idx})">+ Restock</button>
             <button class="btn" style="flex:1; background:var(--bad); color:#fff; padding:9px; font-size:13px;" onclick="sellItem(${r._idx})">− Sold</button>
           </div>
-          <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid #7A4E00; color:#7A4E00; padding:9px; font-size:13px;" onclick="spoilItem(${r._idx})">🗑 Spoiled / Wasted</button>
+          <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px dashed var(--ink); color:var(--ink); padding:9px; font-size:13px;" onclick="spoilItem(${r._idx})">🗑 Spoiled / Wasted</button>
           <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--brass); color:var(--brass); padding:9px; font-size:13px;" onclick="openItemModal(${r._idx})">✏️ Edit Item</button>
           <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--teal); color:var(--teal); padding:9px; font-size:13px;" onclick="openSupplierPriceModal(${r._idx})">💰 Update Supplier Price</button>
           <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--bad); color:var(--bad); padding:9px; font-size:13px;" onclick="delItem('inventory', ${r._idx})">Delete Item</button>
@@ -2048,7 +2041,7 @@ function openItemModal(editIndex){
     <label>Expiry Date <span style="font-weight:400; color:var(--ink-soft); font-size:11px;">(optional)</span></label>
     ${buildDateSelects('im-expiry', item?item.expiryDate:'')}
 
-    <label style="display:flex; align-items:center; gap:8px; margin:14px 0 10px; padding:10px; background:#FCF3DF; border-radius:10px;">
+    <label style="display:flex; align-items:center; gap:8px; margin:14px 0 10px; padding:10px; background:var(--page-line); border-radius:10px;">
       <input type="checkbox" id="im-is-composite" ${isComp?'checked':''} onchange="toggleCompositeUI(this.checked)" style="width:auto;">
       This is a composite product <span style="font-weight:400; font-size:12px;">(e.g. Rim → Pack → Stick)</span>
     </label>
@@ -2218,7 +2211,7 @@ function getGMROI(sel){
 function renderHealthMatrix(){
   const stats = getInventoryHealthData();
   const tiers=['A','B','C'], moves=['Fast','Slow','Dead'];
-  const colorFor = m => m==='Fast' ? 'var(--good-bg)' : m==='Dead' ? 'var(--bad-bg)' : '#FCF3DF';
+  const colorFor = m => m==='Fast' ? 'var(--good-bg)' : m==='Dead' ? 'var(--bad-bg)' : 'var(--page-line)';
   let html = `<div style="display:grid; grid-template-columns:36px repeat(3,1fr); gap:6px; font-size:12px;">
     <div></div><div style="text-align:center; font-weight:700;">Fast</div><div style="text-align:center; font-weight:700;">Slow</div><div style="text-align:center; font-weight:700;">Dead</div>`;
   tiers.forEach(t=>{
@@ -2493,9 +2486,9 @@ function drawInsightCharts(sel){
       data: {
         labels: daily.map(d=>d.date.slice(8,10)),
         datasets: [
-          {label:'Revenue (Gross Income)', data: daily.map(d=>d.income), borderColor:'#2C6E7F', backgroundColor:'#2C6E7F', tension:0.2},
-          {label:'Store Expenses', data: daily.map(d=>d.expense), borderColor:'#8C3A32', backgroundColor:'#8C3A32', tension:0.2},
-          {label:'Profit (Net)', data: daily.map(d=>d.net), borderColor:'#A9762F', backgroundColor:'#A9762F', tension:0.2, borderDash:[6,3]}
+          {label:'Revenue (Gross Income)', data: daily.map(d=>d.income), borderColor:'#111111', backgroundColor:'#111111', tension:0.2},
+          {label:'Store Expenses', data: daily.map(d=>d.expense), borderColor:'#999999', backgroundColor:'#999999', tension:0.2, borderDash:[4,3]},
+          {label:'Profit (Net)', data: daily.map(d=>d.net), borderColor:'#111111', backgroundColor:'#111111', tension:0.2, borderDash:[2,2]}
         ]
       },
       options: { responsive:true, plugins:{legend:{position:'bottom'}} }
@@ -2510,7 +2503,7 @@ function drawInsightCharts(sel){
       data: {
         labels: household.map(h=>h.cat),
         datasets: [{ data: household.map(h=>h.total),
-          backgroundColor:['#A9762F','#2C6E7F','#8C3A32','#2E6B4F','#D9A55C','#16423C','#6B6255','#C98A2C'] }]
+          backgroundColor:['#111111','#333333','#555555','#777777','#999999','#B3B3B3','#CCCCCC','#E0E0E0'] }]
       },
       options: { responsive:true, plugins:{legend:{position:'bottom'}} }
     });
@@ -2524,7 +2517,7 @@ function drawInsightCharts(sel){
         type: 'line',
         data: {
           labels: exp.cumulative.map(d=>d.date.slice(8,10)),
-          datasets: [{label:'Cumulative Stall Spending', data: exp.cumulative.map(d=>d.cumulative), borderColor:'#A9762F', backgroundColor:'#A9762F', tension:0.2, fill:true}]
+          datasets: [{label:'Cumulative Stall Spending', data: exp.cumulative.map(d=>d.cumulative), borderColor:'#111111', backgroundColor:'rgba(17,17,17,0.15)', tension:0.2, fill:true}]
         },
         options: { responsive:true, plugins:{legend:{position:'bottom'}} }
       });
@@ -2550,9 +2543,9 @@ function expandChart(type){
       type:'line',
       data:{ labels: daily.map(d=>d.date.slice(8,10)),
         datasets:[
-          {label:'Revenue (Gross Income)', data:daily.map(d=>d.income), borderColor:'#2C6E7F', backgroundColor:'#2C6E7F', tension:0.2},
-          {label:'Store Expenses', data:daily.map(d=>d.expense), borderColor:'#8C3A32', backgroundColor:'#8C3A32', tension:0.2},
-          {label:'Profit (Net)', data:daily.map(d=>d.net), borderColor:'#A9762F', backgroundColor:'#A9762F', tension:0.2, borderDash:[6,3]}
+          {label:'Revenue (Gross Income)', data:daily.map(d=>d.income), borderColor:'#111111', backgroundColor:'#111111', tension:0.2},
+          {label:'Store Expenses', data:daily.map(d=>d.expense), borderColor:'#999999', backgroundColor:'#999999', tension:0.2, borderDash:[4,3]},
+          {label:'Profit (Net)', data:daily.map(d=>d.net), borderColor:'#111111', backgroundColor:'#111111', tension:0.2, borderDash:[2,2]}
         ]},
       options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:14}}}} }
     });
@@ -2563,7 +2556,7 @@ function expandChart(type){
       type:'pie',
       data:{ labels: household.map(h=>h.cat),
         datasets:[{ data: household.map(h=>h.total),
-          backgroundColor:['#A9762F','#2C6E7F','#8C3A32','#2E6B4F','#D9A55C','#16423C','#6B6255','#C98A2C'] }]},
+          backgroundColor:['#111111','#333333','#555555','#777777','#999999','#B3B3B3','#CCCCCC','#E0E0E0'] }]},
       options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:14}}}} }
     });
   } else if(type === 'expansion'){
@@ -2572,7 +2565,7 @@ function expandChart(type){
     modalChart = new Chart(document.getElementById('modalCanvas'), {
       type:'line',
       data:{ labels: exp.cumulative.map(d=>d.date.slice(8,10)),
-        datasets:[{label:'Cumulative Stall Spending', data: exp.cumulative.map(d=>d.cumulative), borderColor:'#A9762F', backgroundColor:'#A9762F', tension:0.2, fill:true}]},
+        datasets:[{label:'Cumulative Stall Spending', data: exp.cumulative.map(d=>d.cumulative), borderColor:'#111111', backgroundColor:'rgba(17,17,17,0.15)', tension:0.2, fill:true}]},
       options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:14}}}} }
     });
   }
