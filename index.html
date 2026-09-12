@@ -410,7 +410,7 @@ const CATEGORY_PREFIX = {
 const SCHEDULE_TYPES = ["Fixed Day","Irregular","Canvass Only"];
 const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-const APP_VERSION = "v28.2.3"; // bump this by hand with each future commit
+const APP_VERSION = "v28.4.0"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -1144,10 +1144,13 @@ function renderDaily(){
     <div class="card">
       <label>Date / Petsa</label>
       <input type="date" id="d-date" value="${todayStr()}">
-      <label>Ending Cash Counted (₱) — Natitirang Pera sa Kahon</label>
+      <label>Ending Cash Counted (₱) — Bilangin ang TODAY's cash lang, huwag nang ibawas ang gastos</label>
       <input type="number" id="d-ending" placeholder="0" inputmode="decimal">
-      <p class="subtitle" style="margin:2px 0 10px;">Count what's physically in the drawer at closing. Sales will be calculated automatically — don't type sales directly.</p>
-      <label>Stock Purchases Out (₱) — Pambili ng Paninda</label>
+      <p class="subtitle" style="margin:2px 0 10px;">Count what's physically in today's pile at closing — do NOT subtract expenses on paper anymore. Sales will be calculated automatically — don't type sales directly.</p>
+      <label>Expenses paid from TODAY's cash (₱) — Karaniwang 0</label>
+      <input type="number" id="d-fromtoday" placeholder="0" inputmode="decimal">
+      <p class="subtitle" style="margin:2px 0 10px;">Leave 0 kung yesterday's reserve ang nagbayad ng gastos. Fill only kapag naubos ang yesterday's pot at kumain sa today's benta ang pambili.</p>
+      <label>Stock Purchases Out (₱) — Kabuuang Pambili, kahit saang supot bayad</label>
       <input type="number" id="d-purch" placeholder="0" inputmode="decimal">
       <label>GCash Fee Earned (₱) — Kita sa GCash</label>
       <input type="number" id="d-fee" placeholder="0" inputmode="decimal">
@@ -1165,7 +1168,7 @@ function renderDaily(){
         return `<div class="entry">
           <div>
             <div><b>${r.date}</b>${balanceNote}</div>
-            <div class="meta">Sales ${peso(r.salesIn)} (Ending Cash: ${peso(r.enteredEndingCash)}) · Bought ${peso(r.purchOut)} · GCash ${peso(r.fee)} · To home ${peso(r.movedDraw)} · by ${escapeHtml(r.loggedBy)||'-'}</div>
+            <div class="meta">Sales ${peso(r.salesIn)} (Ending Cash: ${peso(r.enteredEndingCash)}${r.expFromTodayCash ? ` · from today's cash ${peso(r.expFromTodayCash)}` : ''}) · Bought ${peso(r.purchOut)} · GCash ${peso(r.fee)} · To home ${peso(r.movedDraw)} · by ${escapeHtml(r.loggedBy)||'-'}</div>
           </div>
           <div style="text-align:right;">
             <div class="amt ${net>=0?'pos':'neg'}">${peso(net)}</div>
@@ -1180,14 +1183,18 @@ function renderDaily(){
 function addDaily(){
   const date = document.getElementById('d-date').value || todayStr();
   const endingCash = parseFloat(document.getElementById('d-ending').value)||0;
+  const fromTodayCash = parseFloat(document.getElementById('d-fromtoday').value)||0;
   const purchOut = parseFloat(document.getElementById('d-purch').value)||0;
   const fee = parseFloat(document.getElementById('d-fee').value)||0;
   const movedDraw = parseFloat(document.getElementById('d-draw').value)||0;
-  const salesIn = endingCash + purchOut + movedDraw; // drawer starts at 0 each day, so this reconstructs true Sales
+  // v28.4.0 pot-aware reconstruction: today's pile only lost the expenses paid FROM it,
+  // so only those get added back. Reserve/GCash-paid expenses never touched the count.
+  const salesIn = endingCash + fromTodayCash + movedDraw;
   const entry = {
     date,
     salesIn,
     enteredEndingCash: endingCash,
+    expFromTodayCash: fromTodayCash,
     purchOut,
     fee,
     movedDraw,
@@ -2744,7 +2751,7 @@ function renderHelp(){
 
     <div class="help-h">Paano Gamitin ang Bawat Tool</div>
     <p class="help-p"><b>🏠 Store Health</b> — ang unang makikita mo. Buod ng kita, gastos, at kung kumikita ang tindahan ngayong buwan, kasama ang paalala kung may mababang stock, malapit nang mag-expire, o may dapat bayarang utang.</p>
-    <p class="help-p"><b>🗓️ Today's Entry</b> — ilagay ang benta, pambili, at kita sa GCash tuwing gabi bago magsara.</p>
+    <p class="help-p"><b>🗓️ Today's Entry</b> — tuwing gabi bago magsara: bilangin ang cash ng TODAY lang (huwag nang ibawas ang gastos sa papel), ilagay ang kabuuang pambili kahit saang supot galing, at kung may bahagi ng gastos na bayad mula sa today's cash mismo (karaniwang 0, kasi yesterday's reserve ang unang nagbabayad). Awtomatikong kalkulahin ang benta — huwag mag-type ng benta.</p>
     <p class="help-p"><b>📲 GCash</b> — para lang sa cash-in/cash-out ng customer, hindi sa pambayad sa supplier.</p>
     <p class="help-p"><b>💵 Household Budget</b> — '+ Add' kapag may bagong gastos, '− Fix' kung mali ang nailagay, ✕ para tanggalin ang kategorya. May History button na protektado ng sariling passkey.</p>
     <p class="help-p"><b>📒 Utang / Loans</b> — bawat may utang na supplier o pautang, ilista dito para may paalala ang due date.</p>

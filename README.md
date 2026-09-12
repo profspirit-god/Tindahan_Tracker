@@ -52,6 +52,8 @@ The entire app is built around keeping four types of money **strictly separate**
 
 Note: Consignment loan accruals (debt that builds up automatically as linked Inventory items sell) live entirely in `payables` and never touch `dailyLogs` or any pot total on their own — same as how a One-time or Installment loan's balance was already independent of the pots. Only an actual cash movement (e.g. logging a remittance, or a manual "Stock Purchases Out" entry) should ever touch a pot.
 
+Note (v28.4.0): expenses are paid from mixed pots in a fixed order (yesterday's reserve → today's pile → GCash), so Today's Entry reconstructs sales pot-awarely: literal count of today's pile + expenses paid from that pile + household draw. See `AI_INSTRUCTIONS.md` for the full convention.
+
 ## Features
 
 - **Store Health** (default view) — monthly Revenue/Expenses/Profit/Net, a PROFITABLE/NEEDS ATTENTION verdict stamp, and the "Data Tools" panel (Word/text export, full-state JSON export, per-table JSON export, JSON import, Reset, Read-only toggle).
