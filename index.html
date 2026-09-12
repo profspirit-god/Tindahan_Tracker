@@ -248,12 +248,10 @@
 <div id="lock-screen">
   <h2>🔒 Tindahan Tracker</h2>
   <p>Enter the family PIN</p>
-  <input type="password" id="lock-input" inputmode="numeric" maxlenght="4" autofocus>
+  <input type="password" id="lock-input" inputmode="numeric" maxlength="4" autofocus>
   <div id="lock-error"></div>
   <button id="lock-btn" onclick="checkPin()">Unlock</button>
 </div>
-<body>
-<div id="sync-banner" style="display:none; position:sticky; top:0; z-index:10; font-size:12.5px; padding:8px 14px; border-bottom:2px solid; text-align:center;"></div>
 <button id="hamburger-btn" onclick="toggleSidebar()">☰</button>
 <button id="notif-btn" onclick="openNotifPanel()">🔔<span id="notif-badge" class="notif-badge"></span></button>
 <button id="undo-btn" onclick="undoLast()" style="display:none; position:fixed; top:14px; right:70px; z-index:30; background:var(--cover); color:#fff; border:none; width:42px; height:42px; border-radius:10px; font-size:18px; box-shadow:0 2px 8px rgba(0,0,0,.3);">↶</button>
@@ -284,7 +282,7 @@
 <div id="username-screen">
   <h2>👤 Sino Ka?</h2>
   <p>Enter your name (e.g. Father, Mother, Tita, your name)</p>
-  <input type="text" id="username-input" placeholder="Your name" maxlenght="20">
+  <input type="text" id="username-input" placeholder="Your name" maxlength="20">
   <div id="username-error"></div>
   <button id="lock-btn" onclick="submitUsername()">Continue</button>
   <button id="username-claim" style="display:none;" onclick="claimExistingName()">This is me - I'm using a new device</button>
@@ -380,7 +378,7 @@ function switchUser(){
 
 document.addEventListener('DOMContentLoaded', ()=>{
   const input = document.getElementById('lock-input');
-  if(input) input.addEventListener('keydoen', e=>{ if(e.key==='Enter') checkPin(); });
+  if(input) input.addEventListener('keydown', e=>{ if(e.key==='Enter') checkPin(); });
 });
 
 const STORAGE_KEY = "family-store-data";
@@ -407,7 +405,7 @@ const CATEGORY_PREFIX = {
 const SCHEDULE_TYPES = ["Fixed Day","Irregular","Canvass Only"];
 const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-const APP_VERSION = "v28.0.0"; // bump this by hand with each future commit
+const APP_VERSION = "v28.1.0"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -605,7 +603,11 @@ function peso(n){
   return (neg?"-":"") + "₱" + s;
 }
 function todayStr(){
-  return new Date().toISOString().slice(0,10);
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 function monthKey(dateStr){
   return (dateStr||"").slice(0,7);
@@ -900,6 +902,12 @@ function renderHome(){
 
     <div class="stamp ${sum.net>=0?'good':'bad'}" style="margin-top:16px;">${sum.net>=0 ? "PROFITABLE THIS MONTH" : "NEEDS ATTENTION"}</div>
 
+    ${lowStockCount > 0 || expiringSoonCount > 0 ? `
+    <div style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
+      ${lowStockCount > 0 ? `<span class="pill overdue" style="font-size:12px; padding:6px 12px; margin:0; background:var(--ink); color:#fff;">📦 ${lowStockCount} Low Stock</span>` : ''}
+      ${expiringSoonCount > 0 ? `<span class="pill overdue" style="font-size:12px; padding:6px 12px; margin:0; background:var(--bad); color:#fff;">⏳ ${expiringSoonCount} Expiring Soon</span>` : ''}
+    </div>` : ''}
+
     <div class="card">
       <div class="sumline"><span>Revenue (Gross Income)</span><b class="amt pos">${peso(sum.salesIn+sum.feeIn)}</b></div>
       <div class="sumline"><span>Store Expenses</span><b class="amt neg">${peso(sum.purchOut)}</b></div>
@@ -908,7 +916,7 @@ function renderHome(){
       <div class="sumline"><span>Net After Household Draw</span><b class="${sum.net>=0?'amt pos':'amt neg'}">${peso(sum.net)}</b></div>
     </div>
 
-    <button class="btn" style="width:100%; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="refreshFromServer()">🔄 Refresh shared data / Kunin ang bagong data</button>
+    <button class="btn" style="width:100%; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="quickRefresh()">🔄 Refresh shared data / Kunin ang bagong data</button>
     <div id="last-sync" style="text-align:center; font-size:12px; color:var(--ink-soft); margin-top:8px;">${syncStatus==="ok" ? "Last synced OK ✓" : syncStatus==="error" ? "Not synced yet ⚠️" : ""}</div>
 
     <div class="section-title" style="margin-top:22px;">Data Tools</div>
@@ -1036,7 +1044,7 @@ function renderDaily(){
         return `<div class="entry">
           <div>
             <div><b>${r.date}</b>${balanceNote}</div>
-            <div class="meta">Sales ${peso(r.salesIn)} (Ending Cash: ${peso(r.enteredEndingCash)}) · Bought ${peso(r.purchOut)} · GCash ${peso(r.fee)} · To home ${peso(r.movedDraw)} · by ${r.loggedBy||'-'}</div>
+            <div class="meta">Sales ${peso(r.salesIn)} (Ending Cash: ${peso(r.enteredEndingCash)}) · Bought ${peso(r.purchOut)} · GCash ${peso(r.fee)} · To home ${peso(r.movedDraw)} · by ${escapeHtml(r.loggedBy)||'-'}</div>
           </div>
           <div style="text-align:right;">
             <div class="amt ${net>=0?'pos':'neg'}">${peso(net)}</div>
@@ -1095,7 +1103,7 @@ function renderGcash(){
         return `<div class="entry">
           <div>
             <div><b>${r.date}</b></div>
-            <div class="meta">Start ${peso(r.start)} · In ${peso(r.cashIn)} · Out ${peso(r.cashOut)} · Fee ${peso(r.fee)} · by ${r.loggedBy||'-'}</div>
+            <div class="meta">Start ${peso(r.start)} · In ${peso(r.cashIn)} · Out ${peso(r.cashOut)} · Fee ${peso(r.fee)} · by ${escapeHtml(r.loggedBy)||'-'}</div>
           </div>
           <div style="text-align:right;">
             <div class="amt pos">${peso(end)}</div>
@@ -1257,7 +1265,7 @@ function renderPayables(){
         return `<div class="entry">
           <div>
             <div><b>${escapeHtml(r.name)}</b> <span class="pill ${pillClass}">${pillText}</span> ${typeTag?`<span class="pill" style="background:var(--brass); color:#fff;">${typeTag}</span>`:''}</div>
-            <div class="meta">${escapeHtml(r.item||'')} · ${dueLabel} · by ${r.loggedBy||'-'}</div>
+            <div class="meta">${escapeHtml(r.item||'')} · ${dueLabel} · by ${escapeHtml(r.loggedBy)||'-'}</div>
             ${isInstallment ? `<div class="meta">Paid ${peso(getInstallmentPaid(r))} of ${peso(r.totalAmt)}</div>` : ''}
             ${isConsignment ? `<div class="meta">Covers: ${(r.linkedItemIds||[]).map(code=>{const it=state.inventory.find(i=>i.code===code); return it?escapeHtml(it.name):code;}).join(', ')||'—'}</div>` : ''}
           </div>
@@ -2083,11 +2091,6 @@ function closeItemModal(){
   modalCompositeLevels = [];
 }
 
-function closeItemModal(){
-  document.getElementById('item-modal-overlay').classList.remove('open');
-  itemModalEditIndex = null;
-}
-
 function saveItemForm(){
   const name = document.getElementById('im-name').value.trim();
   if(!name){ alert('Item name is required.'); return; }
@@ -2499,8 +2502,7 @@ function drawInsightCharts(sel){
   }
 
   const pieCanvas = document.getElementById('householdPieCanvas');
-  if(pieCanvas){
-    if(household.length===0) return;
+  if(pieCanvas && household.length > 0){
     householdPieChart = new Chart(pieCanvas, {
       type: 'pie',
       data: {
