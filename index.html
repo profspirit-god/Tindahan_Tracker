@@ -9,19 +9,22 @@
 
   :root{
     --cover:#0A0A0A;
-    --cover-dark:#000000;
+    --cover-dark:#050505;
     --page:#FFFFFF;
-    --page-line:#E3E3E3;
-    --ink:#111111;
-    --ink-soft:#6E6E6E;
-    --brass:#111111;
-    --brass-light:#8A8A8A;
-    --teal:#111111;
-    --teal-dark:#000000;
-    --good:#111111;
-    --good-bg:#F0F0F0;
-    --bad:#111111;
-    --bad-bg:#ECECEC;
+    --page-line:#E6E6E6;
+    --ink:#0A0A0A;
+    --ink-soft:#6B6B6B;
+    --brass:#0A0A0A;
+    --brass-light:#9A9A9A;
+    --teal:#7C3AED; /* Amethyst 600 */
+    --teal-dark:#6D28D9; /* Amethyst 700 */
+    --good:#2F7D5D;
+    --good-bg:#F0FDF4;
+    --bad:#C0392B;
+    --bad-bg:#FEF2F2;
+    --accent-soft:#F5F3FF;
+    --accent-soft-border:#DDD6FE;
+    --accent-soft-text:#5B21B6;
     --radius:12px;
   }
   *{box-sizing:border-box;}
@@ -51,7 +54,7 @@
     font-size:28px; letter-spacing:10px; text-align:center; width:180px;
     padding:12px; border-radius: 12px; border:none;
   }
-  #lock-error{color:var(--ink); font-size:13px; height:16px;}
+  #lock-error{color:var(--bad); font-size:13px; height:16px;}
   #lock-btn{
     background:var(--teal); border:none; padding:12px 30px;
     border-radius:12px; font-weight:700; font-size:15px; cursor:pointer;
@@ -65,7 +68,7 @@
     font-size:20px; text-align:center; width:220px;
     padding:12px; border-radius:12px; border:none;
   }
-  #username-error{color:var(--ink); font-size:13px; min-height:16px;}
+  #username-error{color:var(--bad); font-size:13px; min-height:16px;}
   #username-claim{background:none; border:none; color:var(--brass-light); text-decoration:underline; font-size:12.5px; cursor:pointer;}
  
   header.top{
@@ -134,23 +137,23 @@
     display:inline-block; font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:20px;
     margin-left:6px;
   }
-  .pill.paid{background:var(--good-bg); color:var(--ink-soft);}
-  .pill.unpaid{background:#fff; color:var(--ink); border:1px solid var(--ink);}
-  .pill.overdue{background:var(--ink); color:#fff;}
+  .pill.paid{background:var(--good-bg); color:var(--good);}
+  .pill.unpaid{background:#fff; color:var(--bad); border:1px solid var(--bad);}
+  .pill.overdue{background:var(--bad); color:#fff;}
   .del{background:none; border:none; color:var(--ink-soft); font-size:18px; cursor:pointer; padding:2px 6px;}
   .stamp{
     border:3px solid; border-radius:14px; padding:14px 10px; text-align:center;
     font-family:'Space Grotesk', sans-serif; font-weight:700; font-size:18px; letter-spacing:1px;
     transform:rotate(-2deg); margin:16px 0;
   }
-  .stamp.good{border-color:var(--ink); color:#fff; background:var(--ink);}
-  .stamp.bad{border-color:var(--ink); color:var(--ink); background:#fff; border-style:dashed;}
+  .stamp.good{border-color:var(--good); color:#fff; background:var(--good);}
+  .stamp.bad{border-color:var(--bad); color:var(--bad); background:#fff; border-style:dashed;}
   .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .sumline{display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px dashed var(--page-line); font-size:15px;}
   .sumline:last-child{border:none;}
   .sumline b{font-weight:700;}
   .tip{
-    background:var(--page-line); border-left:4px solid var(--brass); padding:12px 14px; border-radius:8px;
+    background:var(--accent-soft); border-left:4px solid var(--teal); padding:12px 14px; border-radius:8px;
     margin-bottom:10px; font-size:14.5px; line-height:1.5;
   }
   .help-h{font-family:'Space Grotesk', sans-serif; font-weight:600; font-size:16.5px; color:var(--teal-dark); margin:18px 0 6px;}
@@ -160,7 +163,7 @@
   .field-inline{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0;}
   .field-inline input{width:110px; text-align:right;}
   .banner{
-    font-size:12.5px; background:var(--page-line); border:1px solid var(--brass-light); color:var(--ink-soft);
+    font-size:12.5px; background:var(--accent-soft); border:1px solid var(--accent-soft-border); color:var(--accent-soft-text);
     padding:8px 12px; border-radius:10px; margin-bottom:14px;
   }
 
@@ -178,7 +181,7 @@
 .search-row input{flex:1;}
 .filter-row{display:flex; gap:8px; margin-bottom:14px;}
 .filter-row select{flex:1; font-size:13px; padding:9px;}
-.code-badge{font-size:11px; font-weight:700; background:var(--page-line); color:var(--ink); padding:2px 8px; border-radius:6px; margin-left:6px;}
+.code-badge{font-size:11px; font-weight:700; background:var(--accent-soft); color:var(--accent-soft-text); padding:2px 8px; border-radius:6px; margin-left:6px;}
 .item-row{background:#fff; border:1px solid var(--page-line); border-radius:12px; margin-bottom:10px; overflow:hidden;}
 .item-row-head{padding:12px 14px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;}
 .item-row-body{padding:0 14px 14px; border-top:1px dashed var(--page-line);}
@@ -1713,7 +1716,7 @@ function renderInventory(){
       return `<div class="item-row">
         <div class="item-row-head" onclick="toggleExpand(${r._idx})">
           <div>
-            <b>${escapeHtml(r.name)}</b><span class="code-badge">${r.code}</span> ${low?`<span class="pill overdue">LOW</span>`:''} ${(dLeft!==null && dLeft<=7) ? `<span class="pill overdue" style="background:var(--ink); color:#fff; border:1px dashed #fff;">${dLeft<0?'EXPIRED':'EXPIRING'}</span>` : ''}
+            <b>${escapeHtml(r.name)}</b><span class="code-badge">${r.code}</span> ${low?`<span class="pill overdue">LOW</span>`:''} ${(dLeft!==null && dLeft<=7) ? `<span class="pill overdue" style="background:var(--bad); color:#fff; border:1px dashed #fff;">${dLeft<0?'EXPIRED':'EXPIRING'}</span>` : ''}
             <div class="meta">Stock: ${r.isComposite ? breakdownStock(r) : `${r.stock} ${r.unit}`} · ${r.category}</div>
           </div>
           <span class="chevron ${isOpen?'open':''}">▶</span>
@@ -2486,9 +2489,9 @@ function drawInsightCharts(sel){
       data: {
         labels: daily.map(d=>d.date.slice(8,10)),
         datasets: [
-          {label:'Revenue (Gross Income)', data: daily.map(d=>d.income), borderColor:'#111111', backgroundColor:'#111111', tension:0.2},
-          {label:'Store Expenses', data: daily.map(d=>d.expense), borderColor:'#999999', backgroundColor:'#999999', tension:0.2, borderDash:[4,3]},
-          {label:'Profit (Net)', data: daily.map(d=>d.net), borderColor:'#111111', backgroundColor:'#111111', tension:0.2, borderDash:[2,2]}
+          {label:'Revenue (Gross Income)', data: daily.map(d=>d.income), borderColor:'#7C3AED', backgroundColor:'#7C3AED', tension:0.2},
+          {label:'Store Expenses', data: daily.map(d=>d.expense), borderColor:'#C0392B', backgroundColor:'#C0392B', tension:0.2, borderDash:[4,3]},
+          {label:'Profit (Net)', data: daily.map(d=>d.net), borderColor:'#2F7D5D', backgroundColor:'#2F7D5D', tension:0.2, borderDash:[2,2]}
         ]
       },
       options: { responsive:true, plugins:{legend:{position:'bottom'}} }
@@ -2503,7 +2506,7 @@ function drawInsightCharts(sel){
       data: {
         labels: household.map(h=>h.cat),
         datasets: [{ data: household.map(h=>h.total),
-          backgroundColor:['#111111','#333333','#555555','#777777','#999999','#B3B3B3','#CCCCCC','#E0E0E0'] }]
+          backgroundColor:['#7C3AED','#A78BFA','#C4B5FD','#DDD6FE','#EDE9FE','#F5F3FF','#0A0A0A','#6B6B6B'] }]
       },
       options: { responsive:true, plugins:{legend:{position:'bottom'}} }
     });
@@ -2517,7 +2520,7 @@ function drawInsightCharts(sel){
         type: 'line',
         data: {
           labels: exp.cumulative.map(d=>d.date.slice(8,10)),
-          datasets: [{label:'Cumulative Stall Spending', data: exp.cumulative.map(d=>d.cumulative), borderColor:'#111111', backgroundColor:'rgba(17,17,17,0.15)', tension:0.2, fill:true}]
+          datasets: [{label:'Cumulative Stall Spending', data: exp.cumulative.map(d=>d.cumulative), borderColor:'#7C3AED', backgroundColor:'rgba(124,58,237,0.15)', tension:0.2, fill:true}]
         },
         options: { responsive:true, plugins:{legend:{position:'bottom'}} }
       });
@@ -2543,9 +2546,9 @@ function expandChart(type){
       type:'line',
       data:{ labels: daily.map(d=>d.date.slice(8,10)),
         datasets:[
-          {label:'Revenue (Gross Income)', data:daily.map(d=>d.income), borderColor:'#111111', backgroundColor:'#111111', tension:0.2},
-          {label:'Store Expenses', data:daily.map(d=>d.expense), borderColor:'#999999', backgroundColor:'#999999', tension:0.2, borderDash:[4,3]},
-          {label:'Profit (Net)', data:daily.map(d=>d.net), borderColor:'#111111', backgroundColor:'#111111', tension:0.2, borderDash:[2,2]}
+          {label:'Revenue (Gross Income)', data:daily.map(d=>d.income), borderColor:'#7C3AED', backgroundColor:'#7C3AED', tension:0.2},
+          {label:'Store Expenses', data:daily.map(d=>d.expense), borderColor:'#C0392B', backgroundColor:'#C0392B', tension:0.2, borderDash:[4,3]},
+          {label:'Profit (Net)', data:daily.map(d=>d.net), borderColor:'#2F7D5D', backgroundColor:'#2F7D5D', tension:0.2, borderDash:[2,2]}
         ]},
       options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:14}}}} }
     });
@@ -2556,7 +2559,7 @@ function expandChart(type){
       type:'pie',
       data:{ labels: household.map(h=>h.cat),
         datasets:[{ data: household.map(h=>h.total),
-          backgroundColor:['#111111','#333333','#555555','#777777','#999999','#B3B3B3','#CCCCCC','#E0E0E0'] }]},
+          backgroundColor:['#7C3AED','#A78BFA','#C4B5FD','#DDD6FE','#EDE9FE','#F5F3FF','#0A0A0A','#6B6B6B'] }]},
       options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:14}}}} }
     });
   } else if(type === 'expansion'){
@@ -2565,7 +2568,7 @@ function expandChart(type){
     modalChart = new Chart(document.getElementById('modalCanvas'), {
       type:'line',
       data:{ labels: exp.cumulative.map(d=>d.date.slice(8,10)),
-        datasets:[{label:'Cumulative Stall Spending', data: exp.cumulative.map(d=>d.cumulative), borderColor:'#111111', backgroundColor:'rgba(17,17,17,0.15)', tension:0.2, fill:true}]},
+       datasets:[{label:'Cumulative Stall Spending', data: exp.cumulative.map(d=>d.cumulative), borderColor:'#7C3AED', backgroundColor:'rgba(124,58,237,0.15)', tension:0.2, fill:true}]},
       options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:14}}}} }
     });
   }
