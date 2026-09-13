@@ -1089,7 +1089,7 @@
         "Saturday",
       ];
 
-      const APP_VERSION = "v28.7.0"; // bump this by hand with each future commit
+      const APP_VERSION = "v28.7.1"; // bump this by hand with each future commit
 
       const NAV_ITEMS = [
         { view: "daily", ic: "🗓️", label: "Today's Entry" },
@@ -1142,7 +1142,8 @@
         "Price Alert": "💰",
         "Supplier Today": "🚚",
         "No Entry": "📝",
-        Uncollected: "🤝",
+        "Uncollected": "🤝",
+        "Low Margin": "🏷️",
       };
       let notifExpandedGroups = {};
       function getNotifications() {
@@ -1238,6 +1239,14 @@
             });
           }
         });
+        (state.inventory||[]).forEach(r=>{
+const price = Number(r.price)||0;
+if(price<=0) return;
+const pct = Math.round(((price - (Number(r.cost)||0)) / price) * 100);
+if(pct < 10){
+notifs.push({type:'Low Margin', text:`${r.name} — margin only ${pct}% (cost ${peso(r.cost)} vs sell ${peso(r.price)})`});
+}
+});
         const todayName = WEEKDAYS[new Date().getDay()];
         state.suppliers
           .filter(
