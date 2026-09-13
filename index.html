@@ -243,7 +243,23 @@
   font-size:10px; font-weight:700; border-radius:10px; min-width:18px; height:18px;
   display:none; align-items:center; justify-content:center; padding:0 4px;
 }
-
+/* --- Comfort modes (v28.6.0): larger type + reduced motion, per device --- */
+body.big-text{ font-size:20px; }
+body.big-text label{ font-size:15px; }
+body.big-text .subtitle{ font-size:15px; }
+body.big-text .entry .meta{ font-size:14px; }
+body.big-text .sumline{ font-size:17px; }
+body.big-text .help-p{ font-size:16.5px; }
+body.big-text .btn{ font-size:17px; }
+body.big-text .pill{ font-size:13px; }
+body.big-text .code-badge{ font-size:12.5px; }
+body.big-text .tile .en{ font-size:18px; }
+body.big-text .tile .fil{ font-size:14px; }
+body.big-text input[type=text], body.big-text input[type=number], body.big-text input[type=date], body.big-text select, body.big-text textarea{ font-size:18px; }
+body.no-motion *, body.no-motion *::before, body.no-motion *::after{ transition:none !important; animation:none !important; }
+@media (prefers-reduced-motion: reduce){
+*, *::before, *::after{ transition:none !important; animation:none !important; }
+}
 /* --- Desktop layout (v28.4.1): fill the screen, form left / list right --- */
 .split{ display:block; }
 @media (min-width: 900px){
@@ -419,7 +435,7 @@ const CATEGORY_PREFIX = {
 const SCHEDULE_TYPES = ["Fixed Day","Irregular","Canvass Only"];
 const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-const APP_VERSION = "v28.5.1"; // bump this by hand with each future commit
+const APP_VERSION = "v28.6.0"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -441,6 +457,9 @@ function renderSidebar(){
     <div class="sb-link ${view==='home'?'active':''}" onclick="navFromSidebar('home')"><span class="ic">🏠</span> Store Health</div>
     <div class="sb-divider"></div>
     ${NAV_ITEMS.map(n=>`<div class="sb-link ${view===n.view?'active':''}" onclick="navFromSidebar('${n.view}')"><span class="ic">${n.ic}</span> ${n.label}</div>`).join('')}
+    <div class="sb-link" onclick="toggleBigText()"><span class="ic">🔠</span> ${document.body.classList.contains('big-text')?'Text Size: Large':'Text Size: Normal'}</div>
+    <div class="sb-link" onclick="toggleMotion()"><span class="ic">🎬</span> ${document.body.classList.contains('no-motion')?'Motion: Reduced':'Motion: Normal'}</div>
+    <div class="sb-divider"></div>
     <div class="sb-version">Tindahan Tracker · ${APP_VERSION}</div>
   `;
 }
@@ -458,7 +477,7 @@ function getLastDailyLogDate(){
   return state.dailyLogs.reduce((max,r)=> (r.date && r.date>max) ? r.date : max, state.dailyLogs[0].date||"");
 }
 const NOTIF_ICONS = {
-  'Low Stock':'📦', 'Expiring Soon':'⏳', 'Unpaid Loan':'📒',
+  'Low Stock':'📦', 'Expiring Soon':'⏳', 'Unpaid Loan':'📒', 'Dead Stock':'💤',
   'Price Alert':'💰', 'Supplier Today':'🚚', 'No Entry':'📝'
 };
 let notifExpandedGroups = {};
@@ -468,7 +487,13 @@ function getNotifications(){
     notifs.push({type:'Low Stock', text:`${r.name} — ${r.stock} ${r.unit} left`}));
   state.inventory.filter(r=>{const d=daysUntil(r.expiryDate); return d!==null && d<=7;}).forEach(r=>
     notifs.push({type:'Expiring Soon', text:`${r.name} — ${daysUntil(r.expiryDate)<0?'EXPIRED':daysUntil(r.expiryDate)+'d left'}`}));
-     state.payables.forEach(p=>{
+    state.inventory.filter(r=>{
+    if(!(Number(r.stock)>0)) return false;
+    const sold = (state.stockHistory||[]).filter(h=>h.item===r.name && h.action && h.action.startsWith('Sold'));
+    const last = sold.length ? Math.max(...sold.map(h=>new Date(h.time).getTime())) : null;
+    return !last || last < Date.now() - 45*86400000;
+    }).forEach(r=> notifs.push({type:'Dead Stock', text:`${r.name} — no sales in 45+ days, ${r.stock} ${r.unit} sitting`}));
+    state.payables.forEach(p=>{
     const balance = getPayableBalance(p);
     if(balance<=0) return;
     if(p.type==="Installment"){
@@ -1913,6 +1938,7 @@ function renderInventory(){
             <div class="sumline"><span>Margin / Unit</span><b>${peso(margin)}</b></div>
           `}
           <div class="sumline"><span>Reorder At</span><b>${r.reorder} ${r.unit}</b></div>
+          ${(() => { const rate = getDailySellRate(r.name); if(rate<=0) return ''; const sugg = Math.max(0, Math.ceil(rate*14 - Number(r.stock))); return `<div class="sumline"><span>Suggested Restock (14 days)</span><b>${sugg>0 ? sugg+' '+r.unit : 'Stock OK'}</b></div>`; })()}
           ${Number(r.consignmentStock)>0 ? `<div class="sumline"><span>Consignment Stock (unpaid)</span><b class="amt neg">${r.consignmentStock} ${r.unit}</b></div>` : ''}
           <div class="sumline"><span>Est. Days of Stock Left</span><b>${(() => {
             const rate = getDailySellRate(r.name);
@@ -2701,7 +2727,7 @@ options: { responsive:true, plugins:{legend:{position:'bottom'}} }
   const pieCanvas = document.getElementById('householdPieCanvas');
   if(pieCanvas && household.length > 0){
     householdPieChart = new Chart(pieCanvas, {
-      type: 'pie',
+      type: 'pie', 
       data: {
         labels: household.map(h=>h.cat),
         datasets: [{ data: household.map(h=>h.total),
@@ -2838,7 +2864,7 @@ function renderHelp(){
     <p class="help-p"><b>Pangalan (Name)</b> — the first time on a new device, type your name so every entry shows who made it. Tap your name at the top of the menu (☰) anytime to switch users on that device.</p>
 
     <div class="help-h">Menu (☰)</div>
-    <p class="help-p">Tap the ☰ icon top-left anytime to open the menu — your name, Store Health, and all 7 tools are listed there. Tap outside the menu, or tap a tool, to close it.</p>
+    <p class="help-p">Tap the ☰ icon top-left anytime to open the menu — your name, Store Health, and all 7 tools are listed there. Tap outside the menu, or tap a tool, to close it. At the bottom of the menu: <b>Text Size</b> (larger type) and <b>Motion</b> (removes animations) toggles — nai-save per device, para mas komportable sa mata.</p>
 
     <div class="help-h">Ang Tatlong Supot ng Pera (The 3 Pots)</div>
     <p class="help-p"><b>1. Store Cash</b> — pera para sa pagtitinda at pambili ng paninda. Kahit bayad sa supplier gamit ang GCash, dito pa rin ito ilalagay bilang Stock Purchase.</p>
@@ -2907,7 +2933,18 @@ function resetInactivityTimer(){
 ['touchstart','click','keydown','scroll'].forEach(evt=>{
   document.addEventListener(evt, resetInactivityTimer, {passive:true});
 });
-
+function toggleBigText(){
+const on = document.body.classList.toggle('big-text');
+localStorage.setItem('storeBigText', on ? '1' : '0');
+render();
+}
+function toggleMotion(){
+const on = document.body.classList.toggle('no-motion');
+localStorage.setItem('storeNoMotion', on ? '1' : '0');
+render();
+}
+if(localStorage.getItem('storeBigText')==='1') document.body.classList.add('big-text');
+if(localStorage.getItem('storeNoMotion')==='1') document.body.classList.add('no-motion');
 function startApp(){
   (async function(){
     render ();
