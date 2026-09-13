@@ -244,6 +244,17 @@
   display:none; align-items:center; justify-content:center; padding:0 4px;
 }
 
+/* --- Desktop layout (v28.4.1): fill the screen, form left / list right --- */
+.split{ display:block; }
+@media (min-width: 900px){
+  #app, #app-shell{ max-width:100%; }
+  main{ padding:24px 40px 16px; }
+  header.top{ padding-left:76px; padding-right:76px; }
+  #item-modal-sheet{ max-width:720px; }
+  .split{ display:grid; grid-template-columns:minmax(0,5fr) minmax(0,7fr); gap:24px; align-items:start; }
+  .split > *{ min-width:0; }
+}
+
 </style>
 </head>
 <body>
@@ -260,10 +271,8 @@
 <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
 <div id="sidebar"></div>
 <div id="app-shell">
-  <div id="offline-banner" role="status" aria-live="polite" style="display:none; background:#FDE68A; color:#92400E; text-align:center; padding:8px; font-size:13px; font-weight:600; border-bottom: 2px solid #D97706;"></div>
-    ⚠️ Offline: Changes are saved to this device and will sync when you reconnect.
-  </div>
-  <div id="app"></div>
+<div id="offline-banner" role="status" aria-live="polite" style="display:none; background:#FDE68A; color:#92400E; text-align:center; padding:8px; font-size:13px; font-weight:600; border-bottom: 2px solid #D97706;">⚠️ Offline: Changes are saved to this device and will sync when you reconnect.</div>
+<div id="app"></div>
 </div>
 
 <div id="chart-modal">
@@ -410,7 +419,7 @@ const CATEGORY_PREFIX = {
 const SCHEDULE_TYPES = ["Fixed Day","Irregular","Canvass Only"];
 const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-const APP_VERSION = "v28.4.0"; // bump this by hand with each future commit
+const APP_VERSION = "v28.5.0"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -678,7 +687,13 @@ function todayStr(){
   return `${year}-${month}-${day}`;
 }
 function monthKey(dateStr){
-  return (dateStr||"").slice(0,7);
+return (dateStr||"").slice(0,7);
+}
+function prevMonthKey(sel){
+const [y, m] = (sel||"").split('-').map(Number);
+if(!y || !m) return "";
+const d = new Date(Date.UTC(y, m - 2, 1));
+return d.toISOString().slice(0,7);
 }
 function el(html){
   const d = document.createElement('div');
@@ -1020,6 +1035,7 @@ function renderHome(){
     <label>Select Month</label>
     <select id="home-month" onchange="changeMonth(this.value)">${monthOptions}</select>
 
+    <div class="split"><div>
     <div class="stamp ${sum.net>=0?'good':'bad'}" style="margin-top:16px;">${sum.net>=0 ? "PROFITABLE THIS MONTH" : "NEEDS ATTENTION"}</div>
 
     ${lowStockCount > 0 || expiringSoonCount > 0 ? `
@@ -1032,13 +1048,16 @@ function renderHome(){
       <div class="sumline"><span>Revenue (Gross Income)</span><b class="amt pos">${peso(sum.salesIn+sum.feeIn)}</b></div>
       <div class="sumline"><span>Store Expenses</span><b class="amt neg">${peso(sum.purchOut)}</b></div>
       <div class="sumline"><span>Profit (Net Operating)</span><b>${peso(sum.opResult)}</b></div>
-      <div class="sumline"><span>Household Budget</span><b class="amt neg">${peso(sum.householdTotal)}</b></div>
-      <div class="sumline"><span>Net After Household Draw</span><b class="${sum.net>=0?'amt pos':'amt neg'}">${peso(sum.net)}</b></div>
+      <div class="sumline"><span>Household Budget (plan)</span><b class="amt neg">${peso(sum.householdTotal)}</b></div>
+      <div class="sumline"><span>Moved to Household (actual)</span><b class="amt neg">${peso(sum.movedOut)}</b></div>
+      <div class="sumline"><span>Net After Actual Draw</span><b class="${sum.net>=0?'amt pos':'amt neg'}">${peso(sum.net)}</b></div>
+      <div class="sumline"><span>Net If Full Budget Drawn</span><b class="${sum.netPlanned>=0?'amt pos':'amt neg'}">${peso(sum.netPlanned)}</b></div>
     </div>
 
     <button class="btn" style="width:100%; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="quickRefresh()">🔄 Refresh shared data / Kunin ang bagong data</button>
     <div id="last-sync" style="text-align:center; font-size:12px; color:var(--ink-soft); margin-top:8px;">${syncStatus==="ok" ? "Last synced OK ✓" : syncStatus==="offline" ? "Saved locally (Offline) ⏳" : syncStatus==="error" ? "Not synced yet ⚠️" : ""}</div>
 
+    </div><div>
     <div class="section-title" style="margin-top:22px;">Data Tools</div>
     <button class="btn" style="width:100%; background:var(--brass); color:#fff;" onclick="downloadWordSummary()">⬇ Download Summary (Word)</button>
     <button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="exportAllData()">📦 Export full app state (JSON)</button>
@@ -1063,6 +1082,7 @@ function renderHome(){
     </div>
     <button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid #444; color:#444;" onclick="importAllDataFromFile()">⬆️ Import state from file (JSON)</button>
     <p class="subtitle" style="margin-top:6px;">Reset clears Today's Entries, GCash, Loans, and household spending totals only. Top Items is always kept. Use export before risky actions.</p>
+    </div></div>
   </main>`;
 }
 
@@ -1113,8 +1133,10 @@ function downloadWordSummary(){
   row("Stock Purchases Out", peso(sum.purchOut));
   row("GCash Fees Earned", peso(sum.feeIn));
   row("Store Operating Result", peso(sum.opResult));
-  row("Household Budget", peso(sum.householdTotal));
-  row("Net After Household Draw", peso(sum.net));
+  row("Household Budget (plan)", peso(sum.householdTotal));
+  row("Moved to Household (actual)", peso(sum.movedOut));
+  row("Net After Actual Draw", peso(sum.net));
+  row("Net If Full Budget Drawn", peso(sum.netPlanned));
   out += `\nVERDICT: ${sum.net>=0 ? "PROFITABLE THIS MONTH" : "NEEDS ATTENTION"}\n`;
 
   out += "\nHOUSEHOLD BUDGET BREAKDOWN\n"; line("-");
@@ -1141,6 +1163,7 @@ function renderDaily(){
   return `
   ${header("Today's Entry","Ilagay ang benta at pambili ngayong araw", true)}
   <main>
+    <div class="split"><div>
     <div class="card">
       <label>Date / Petsa</label>
       <input type="date" id="d-date" value="${todayStr()}">
@@ -1160,6 +1183,7 @@ function renderDaily(){
       <input type="text" id="d-notes" placeholder="Optional">
       <button class="btn btn-primary" onclick="addDaily()">Save Entry</button>
     </div>
+    </div><div>
     <div class="section-title">Recent Entries</div>
     <div class="card">
       ${rows.length===0 ? `<div class="empty">Wala pang entry. Add your first one above.</div>` : rows.slice(0,dailyShowCount).map((r,i)=>{
@@ -1178,6 +1202,7 @@ function renderDaily(){
       }).join('')}
       ${rows.length > dailyShowCount ? `<button class="btn" style="width:100%; background:transparent; border:1.5px solid var(--teal); color:var(--teal); margin-top:10px;" onclick="showMoreDaily()">⬇ Load ${Math.min(30, rows.length - dailyShowCount)} older entries</button>` : ''}
     </div>
+    </div></div>
   </main>`;
 }
 function addDaily(){
@@ -1212,6 +1237,7 @@ function renderGcash(){
   return `
   ${header("GCash Float","Panghawak na pera para sa cash-in/cash-out", true)}
   <main>
+    <div class="split"><div>
     <div class="card">
       <label>Date / Petsa</label>
       <input type="date" id="g-date" value="${todayStr()}">
@@ -1225,6 +1251,7 @@ function renderGcash(){
       <input type="number" id="g-fee" placeholder="0" inputmode="decimal">
       <button class="btn btn-primary" onclick="addGcash()">Save Entry</button>
     </div>
+    </div><div>
     <div class="section-title">Recent Entries</div>
     <div class="card">
       ${rows.length===0 ? `<div class="empty">Wala pang entry.</div>` : rows.slice(0,gcashShowCount).map(r=>{
@@ -1242,6 +1269,7 @@ function renderGcash(){
       }).join('')}
       ${rows.length > gcashShowCount ? `<button class="btn" style="width:100%; background:transparent; border:1.5px solid var(--teal); color:var(--teal); margin-top:10px;" onclick="showMoreGcash()">⬇ Load ${Math.min(30, rows.length - gcashShowCount)} older entries</button>` : ''}
     </div>
+    </div></div>
   </main>`;
 }
 function addGcash(){
@@ -1310,6 +1338,7 @@ function renderPayables(){
   return `
   ${header("Utang / Loans","Utang sa Supplier at Pautang", true)}
   <main>
+    <div class="split"><div>
     <div class="card">
       <label>Loan Type — Uri ng Utang</label>
       <select id="p-type" onchange="onLoanTypeChange()">
@@ -1375,6 +1404,7 @@ function renderPayables(){
 
       <button class="btn btn-primary" onclick="addPayable()">Save Entry</button>
     </div>
+    </div><div>
     <div class="section-title">All Utang / Loans</div>
     <div class="card">
       ${rows.length===0 ? `<div class="empty">Wala pang utang na naka-record.</div>` : rows.map(r=>{
@@ -1414,6 +1444,7 @@ function renderPayables(){
         </div>`;
       }).join('')}
     </div>
+    </div></div>
   </main>`;
 }
 function onLoanTypeChange(){
@@ -2423,9 +2454,10 @@ function getMonthSummary(sel){
   const movedOut = dRows.reduce((s,r)=>s+(r.movedDraw||0),0);
   const opResult = salesIn + feeIn - purchOut;
   const householdTotal = state.household.reduce((s,h)=>s+(Number(h.budget)||0),0);
-  const net = opResult - householdTotal;
+  const net = opResult - movedOut;               // actual draw (cash truth)
+  const netPlanned = opResult - householdTotal;  // budget-based reference
   const unpaidTotal = state.payables.reduce((s,p)=>s+getPayableBalance(p),0);
-  return {salesIn, purchOut, feeIn, movedOut, opResult, householdTotal, net, unpaidTotal};
+  return {salesIn, purchOut, feeIn, movedOut, opResult, householdTotal, net, netPlanned, unpaidTotal};
 }
 
 function getExpansionInsights(sel){
@@ -2447,9 +2479,9 @@ function renderSummary(){
   const movedOut = dRows.reduce((s,r)=>s+(r.movedDraw||0),0);
   const opResult = salesIn + feeIn - purchOut;
   const householdTotal = state.household.reduce((s,h)=>s+(Number(h.budget)||0),0);
-  const net = opResult - householdTotal;
+  const net = opResult - movedOut;            // actual draw (cash truth)
+  const netPlanned = opResult - householdTotal;
   const unpaidTotal = state.payables.reduce((s,p)=>s+getPayableBalance(p),0);
-
   const monthOptions = buildMonthOptions(sel);
 
   return `
@@ -2462,8 +2494,10 @@ function renderSummary(){
       <div class="sumline"><span>Stock Purchases Out</span><b class="amt neg">${peso(purchOut)}</b></div>
       <div class="sumline"><span>GCash Fees Earned</span><b class="amt pos">${peso(feeIn)}</b></div>
       <div class="sumline"><span>Store Operating Result</span><b>${peso(opResult)}</b></div>
-      <div class="sumline"><span>Household Budget (monthly)</span><b class="amt neg">${peso(householdTotal)}</b></div>
-      <div class="sumline"><span>Net After Household Draw</span><b class="${net>=0?'amt pos':'amt neg'}">${peso(net)}</b></div>
+      <div class="sumline"><span>Household Budget (plan)</span><b class="amt neg">${peso(householdTotal)}</b></div>
+      <div class="sumline"><span>Moved to Household (actual)</span><b class="amt neg">${peso(movedOut)}</b></div>
+      <div class="sumline"><span>Net After Actual Draw</span><b class="${net>=0?'amt pos':'amt neg'}">${peso(net)}</b></div>
+      <div class="sumline"><span>Net If Full Budget Drawn</span><b class="${netPlanned>=0?'amt pos':'amt neg'}">${peso(netPlanned)}</b></div>Net After Household Draw</span><b class="${net>=0?'amt pos':'amt neg'}">${peso(net)}</b></div>
     </div>
     <div class="stamp ${net>=0?'good':'bad'}">${net>=0 ? "PROFITABLE THIS MONTH" : "NEEDS ATTENTION"}</div>
     <div class="card">
@@ -2477,9 +2511,10 @@ function getDailyIncomeExpense(sel){
   const rows = state.dailyLogs.filter(r=>monthKey(r.date)===sel);
   const byDate = {};
   rows.forEach(r=>{
-    if(!byDate[r.date]) byDate[r.date] = {date:r.date, income:0, expense:0};
+    if(!byDate[r.date]) byDate[r.date] = {date:r.date, income:0, expense:0, sales:0};
     byDate[r.date].income += (r.salesIn||0) + (r.fee||0);
     byDate[r.date].expense += (r.purchOut||0);
+    byDate[r.date].sales += (r.salesIn||0);
   });
   return Object.values(byDate).map(d=>({...d, net: d.income - d.expense})).sort((a,b)=>a.date.localeCompare(b.date));
 }
@@ -2497,6 +2532,7 @@ function getHouseholdByCategory(sel){
 let incomeExpenseChart = null;
 let householdPieChart = null;
 let expansionChart = null;
+let salesCompareChart = null;
 let rankMetric = "income";
 let rankOrder = "desc";
 let hhRankOrder = "desc";
@@ -2508,15 +2544,29 @@ function renderInsights(){
   const monthOptions = buildMonthOptions(sel);
   const daily = getDailyIncomeExpense(sel);
   const household = getHouseholdByCategory(sel);
-
+  const prevSel = prevMonthKey(sel);
+  const [py, pm] = prevSel.split('-');
+  const prevLabel = `${MONTHS[parseInt(pm,10)-1]} ${py}`;
+  const curSum = getMonthSummary(sel);
+  const prevSum = getMonthSummary(prevSel);
+  const momRevenue = (curSum.salesIn+curSum.feeIn) - (prevSum.salesIn+prevSum.feeIn);
+  const momNet = curSum.net - prevSum.net;
   return `
   ${header("Insights","Mga Tsart at Ranggo", true)}
   <main>
     <label>Select Month</label>
     <select id="ins-month" onchange="changeMonth(this.value)">${monthOptions}</select>
-
+    <div class="card" style="margin-top:14px;">
+    <div class="sumline"><span>Revenue vs ${prevLabel}</span><b class="${momRevenue>=0?'amt pos':'amt neg'}">${momRevenue>=0?'+':''}${peso(momRevenue)}</b></div>
+    <div class="sumline"><span>Net vs ${prevLabel}</span><b class="${momNet>=0?'amt pos':'amt neg'}">${momNet>=0?'+':''}${peso(momNet)}</b></div>
+    </div>
+    <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
+    Sales Day-by-Day: This Month vs ${prevLabel}
+    <button class="btn" style="background:var(--teal); color:#fff; padding:6px 12px; font-size:12px;" onclick="expandChart('salesCompare')">⤢ Expand</button>
+    </div>
+    <div class="card"><canvas id="salesCompareCanvas" height="220"></canvas></div>
     <div class="section-title" style="margin-top:16px; display:flex; justify-content:space-between; align-items:center;">
-      Revenue, Expenses & Profit
+    Revenue, Expenses & Profit
       <button class="btn" style="background:var(--teal); color:#fff; padding:6px 12px; font-size:12px;" onclick="expandChart('income')">⤢ Expand</button>
     </div>
     <div class="card"><canvas id="incomeExpenseCanvas" height="220"></canvas></div>
@@ -2603,6 +2653,7 @@ function destroyInsightCharts(){
   if(incomeExpenseChart){ incomeExpenseChart.destroy(); incomeExpenseChart = null; }
   if(householdPieChart){ householdPieChart.destroy(); householdPieChart = null; }
   if(expansionChart){ expansionChart.destroy(); expansionChart = null; }
+  if(salesCompareChart){ salesCompareChart.destroy(); salesCompareChart = null; }
 }
 
 function drawInsightCharts(sel){
@@ -2626,7 +2677,27 @@ function drawInsightCharts(sel){
     });
   }
 
-  const pieCanvas = document.getElementById('householdPieCanvas');
+  const scCanvas = document.getElementById('salesCompareCanvas');
+if(scCanvas){
+const pSel = prevMonthKey(sel);
+const [pY, pM] = pSel.split('-');
+const pLabel = `${MONTHS[parseInt(pM,10)-1]} ${pY}`;
+const cLabel = `${MONTHS[parseInt(sel.slice(5,7),10)-1]} ${sel.slice(0,4)}`;
+const prevDaily = getDailyIncomeExpense(pSel);
+const curByDay = {}; daily.forEach(d=>curByDay[parseInt(d.date.slice(8,10),10)] = d.sales);
+const prevByDay = {}; prevDaily.forEach(d=>prevByDay[parseInt(d.date.slice(8,10),10)] = d.sales);
+const dim = new Date(parseInt(sel.slice(0,4),10), parseInt(sel.slice(5,7),10), 0).getDate();
+const dayLabels = Array.from({length: dim}, (_,i)=> i+1);
+salesCompareChart = new Chart(scCanvas, {
+type: 'line',
+data: { labels: dayLabels,
+datasets: [
+{label:cLabel, data: dayLabels.map(d=> curByDay[d] ?? null), borderColor:'#7C3AED', backgroundColor:'#7C3AED', tension:0.2, spanGaps:true},
+{label:pLabel, data: dayLabels.map(d=> prevByDay[d] ?? null), borderColor:'#9A9A9A', backgroundColor:'#9A9A9A', tension:0.2, borderDash:[4,3], spanGaps:true}
+]},
+options: { responsive:true, plugins:{legend:{position:'bottom'}} }
+});
+}
   if(pieCanvas && household.length > 0){
     householdPieChart = new Chart(pieCanvas, {
       type: 'pie',
@@ -2662,7 +2733,30 @@ function expandChart(type){
   const sel = window._selMonth || now.toISOString().slice(0,7);
   const modal = document.getElementById('chart-modal');
   const title = document.getElementById('modal-title');
-  modal.classList.add('open');
+  if(type === 'salesCompare'){
+  if(modalChart){ modalChart.destroy(); modalChart = null; }
+  title.textContent = 'Sales Day-by-Day: This Month vs Previous';
+  const pSel2 = prevMonthKey(sel);
+  const [pY2, pM2] = pSel2.split('-');
+  const pLabel2 = `${MONTHS[parseInt(pM2,10)-1]} ${pY2}`;
+  const cLabel2 = `${MONTHS[parseInt(sel.slice(5,7),10)-1]} ${sel.slice(0,4)}`;
+  const curD2 = getDailyIncomeExpense(sel);
+  const prevD2 = getDailyIncomeExpense(pSel2);
+  const curBy2 = {}; curD2.forEach(d=>curBy2[parseInt(d.date.slice(8,10),10)] = d.sales);
+  const prevBy2 = {}; prevD2.forEach(d=>prevBy2[parseInt(d.date.slice(8,10),10)] = d.sales);
+  const dim2 = new Date(parseInt(sel.slice(0,4),10), parseInt(sel.slice(5,7),10), 0).getDate();
+  const labels2 = Array.from({length: dim2}, (_,i)=> i+1);
+  modalChart = new Chart(document.getElementById('modalCanvas'), {
+  type:'line',
+  data:{ labels: labels2,
+  datasets:[
+  {label:cLabel2, data: labels2.map(d=> curBy2[d] ?? null), borderColor:'#7C3AED', backgroundColor:'#7C3AED', tension:0.2, spanGaps:true},
+  {label:pLabel2, data: labels2.map(d=> prevBy2[d] ?? null), borderColor:'#9A9A9A', backgroundColor:'#9A9A9A', tension:0.2, borderDash:[4,3], spanGaps:true}
+  ]},
+  options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:14}}}} }
+  });
+  return;
+  }
 
   if(modalChart){ modalChart.destroy(); modalChart = null; }
 
@@ -2750,7 +2844,7 @@ function renderHelp(){
     <p class="help-p"><b>3. Household / Bahay</b> — piniling halaga bawat buwan para sa gastos ng pamilya.</p>
 
     <div class="help-h">Paano Gamitin ang Bawat Tool</div>
-    <p class="help-p"><b>🏠 Store Health</b> — ang unang makikita mo. Buod ng kita, gastos, at kung kumikita ang tindahan ngayong buwan, kasama ang paalala kung may mababang stock, malapit nang mag-expire, o may dapat bayarang utang.</p>
+    <p class="help-p"><b>🏠 Store Health</b> — ang unang makikita mo. Buod ng kita, gastos, at kung kumikita ang tindahan ngayong buwan, kasama ang paalala kung may mababang stock, malapit nang mag-expire, o may dapat bayarang utang. Dalawang numero ng net ang makikita mo: <b>Net After Actual Draw</b> (base sa talagang kinuha para sa bahay — dito base ang stamp) at <b>Net If Full Budget Drawn</b> (kung kukunin ang buong budget). Kung malayo ang pagkakaiba, tandaan na may naiwan o nadagdag sa supot ng bahay.</p>
     <p class="help-p"><b>🗓️ Today's Entry</b> — tuwing gabi bago magsara: bilangin ang cash ng TODAY lang (huwag nang ibawas ang gastos sa papel), ilagay ang kabuuang pambili kahit saang supot galing, at kung may bahagi ng gastos na bayad mula sa today's cash mismo (karaniwang 0, kasi yesterday's reserve ang unang nagbabayad). Awtomatikong kalkulahin ang benta — huwag mag-type ng benta.</p>
     <p class="help-p"><b>📲 GCash</b> — para lang sa cash-in/cash-out ng customer, hindi sa pambayad sa supplier.</p>
     <p class="help-p"><b>💵 Household Budget</b> — '+ Add' kapag may bagong gastos, '− Fix' kung mali ang nailagay, ✕ para tanggalin ang kategorya. May History button na protektado ng sariling passkey.</p>
