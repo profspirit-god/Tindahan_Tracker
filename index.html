@@ -419,7 +419,7 @@ const CATEGORY_PREFIX = {
 const SCHEDULE_TYPES = ["Fixed Day","Irregular","Canvass Only"];
 const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-const APP_VERSION = "v28.5.0"; // bump this by hand with each future commit
+const APP_VERSION = "v28.5.1"; // bump this by hand with each future commit
 
 const NAV_ITEMS = [
   {view:'daily', ic:'🗓️', label:"Today's Entry"},
@@ -2497,7 +2497,7 @@ function renderSummary(){
       <div class="sumline"><span>Household Budget (plan)</span><b class="amt neg">${peso(householdTotal)}</b></div>
       <div class="sumline"><span>Moved to Household (actual)</span><b class="amt neg">${peso(movedOut)}</b></div>
       <div class="sumline"><span>Net After Actual Draw</span><b class="${net>=0?'amt pos':'amt neg'}">${peso(net)}</b></div>
-      <div class="sumline"><span>Net If Full Budget Drawn</span><b class="${netPlanned>=0?'amt pos':'amt neg'}">${peso(netPlanned)}</b></div>Net After Household Draw</span><b class="${net>=0?'amt pos':'amt neg'}">${peso(net)}</b></div>
+      <div class="sumline"><span>Net If Full Budget Drawn</span><b class="${netPlanned>=0?'amt pos':'amt neg'}">${peso(netPlanned)}</b></div>
     </div>
     <div class="stamp ${net>=0?'good':'bad'}">${net>=0 ? "PROFITABLE THIS MONTH" : "NEEDS ATTENTION"}</div>
     <div class="card">
@@ -2698,6 +2698,7 @@ datasets: [
 options: { responsive:true, plugins:{legend:{position:'bottom'}} }
 });
 }
+  const pieCanvas = document.getElementById('householdPieCanvas');
   if(pieCanvas && household.length > 0){
     householdPieChart = new Chart(pieCanvas, {
       type: 'pie',
@@ -2733,6 +2734,7 @@ function expandChart(type){
   const sel = window._selMonth || now.toISOString().slice(0,7);
   const modal = document.getElementById('chart-modal');
   const title = document.getElementById('modal-title');
+  modal.classList.add('open');
   if(type === 'salesCompare'){
   if(modalChart){ modalChart.destroy(); modalChart = null; }
   title.textContent = 'Sales Day-by-Day: This Month vs Previous';
