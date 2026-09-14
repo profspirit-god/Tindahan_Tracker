@@ -1055,6 +1055,137 @@
 
       function updateUserBadge() {}
 
+      function currentPerson() {
+        return (
+          (state.people || []).find(
+            (p) => p.name === currentUser && p.active,
+          ) || null
+        );
+      }
+      function isOwner() {
+        const p = currentPerson();
+        return !!p && p.role === "Owner";
+      }
+      function requireOwner() {
+        if (isOwner()) return true;
+        alert("Owner-only action. Mang tanong muna sa Owner ng tindahan.");
+        return false;
+      }
+      function personOkForSession() {
+        return sessionStorage.getItem("personOk") === currentUser;
+      }
+      async function hashCode(code) {
+        return await computeSHA256(code);
+      }
+      function canView(v) {
+        if (isOwner()) return true;
+        return [
+          "home",
+          "daily",
+          "gcash",
+          "inventory",
+          "suppliers",
+          "receivables",
+          "help",
+          "settings",
+        ].includes(v);
+      }
+      function logAudit(action, target, oldVal, newVal) {
+        if (!state.auditLog) state.auditLog = [];
+        state.auditLog.push({
+          time: new Date().toISOString(),
+          by: currentUser || "Unknown",
+          action,
+          target,
+          old: oldVal,
+          new: newVal,
+        });
+        if (state.auditLog.length > 400)
+          state.auditLog = state.auditLog.slice(-400);
+      }
+      let codePad = null; // {mode:'verify'|'enroll', name}
+      function openCodePad(mode, name) {
+        codePad = { mode, name };
+        const sheet = document.getElementById("item-modal-sheet");
+        sheet.innerHTML = `
+<div class="modal-title-row"><h3>🔑 ${mode === "enroll" ? "Set your 4-digit code" : "Enter your code"} — ${escapeHtml(name)}</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+<p class="subtitle">${mode === "enroll" ? "First time for this person: choose a personal 4-digit code. Ita-type ito pagkatapos ng PIN sa bawat bagong tab." : "Personal code ng taong ito — hiwalay ito sa family PIN."}</p>
+<label>Code (4 digits)</label>
+<input type="password" id="cp-code" inputmode="numeric" maxlength="4" placeholder="••••">
+<div id="cp-second" style="${mode === "enroll" ? "" : "display:none;"}">
+<label>Repeat code</label>
+<input type="password" id="cp-code2" inputmode="numeric" maxlength="4" placeholder="••••">
+</div>
+<div id="cp-error" style="color:var(--bad); font-size:13px; min-height:16px; margin-top:6px;"></div>
+<button class="btn btn-primary" onclick="submitCodePad()">Confirm</button>
+`;
+        document.getElementById("item-modal-overlay").classList.add("open");
+      }
+      async function submitCodePad() {
+        const c1 = (document.getElementById("cp-code").value || "").trim();
+        const err = document.getElementById("cp-error");
+        if (!/^\d{4}$/.test(c1)) {
+          err.textContent = "Code must be exactly 4 digits.";
+          return;
+        }
+        const person = (state.people || []).find(
+          (p) => p.name === codePad.name,
+        );
+        if (!person) {
+          err.textContent = "Person not found.";
+          return;
+        }
+        if (codePad.mode === "enroll") {
+          const c2 = (document.getElementById("cp-code2").value || "").trim();
+          if (c1 !== c2) {
+            err.textContent = "Codes do not match.";
+            return;
+          }
+          person.codeHash = await hashCode(c1);
+          logAudit("person-code-set", person.name, "none", "set");
+          saveState();
+          sessionStorage.setItem("personOk", currentUser);
+          codePad = null;
+          closeItemModal();
+          render();
+          return;
+        }
+        const okHash = await hashCode(c1);
+        if (okHash === person.codeHash) {
+          sessionStorage.setItem("personOk", currentUser);
+          codePad = null;
+          closeItemModal();
+          render();
+        } else {
+          err.textContent = "Wrong code — try again.";
+          document.getElementById("cp-code").value = "";
+        }
+      }
+      function ensurePersonCode() {
+        if (!currentUser) return;
+        let p = currentPerson();
+        if (!p) {
+          if (!state.people) state.people = [];
+          state.people.push({
+            name: currentUser,
+            role: "Staff",
+            codeHash: null,
+            active: true,
+          });
+          if (!state.registeredUsers) state.registeredUsers = [];
+          if (!state.registeredUsers.includes(currentUser))
+            state.registeredUsers.push(currentUser);
+          saveState();
+          p = currentPerson();
+        }
+        if (!p.active) {
+          alert("This user is deactivated. Makipag-ugnayan muna sa Owner.");
+          switchUser();
+          return;
+        }
+        if (personOkForSession()) return;
+        openCodePad(p.codeHash ? "verify" : "enroll", p.name);
+      }
       function ensureUsername() {
         if (!state.registeredUsers) state.registeredUsers = [];
         if (currentUser) {
@@ -1104,6 +1235,7 @@
         const ok = confirm(`Switch away from "${currentUser}" on this device`);
         if (!ok) return;
         localStorage.removeItem("storeUsername");
+        sessionStorage.removeItem("personOk");
         currentUser = null;
         document.getElementById("username-input").value = "";
         document.getElementById("username-error").textContent = "";
@@ -1206,7 +1338,7 @@
         "Saturday",
       ];
 
-      const APP_VERSION = "v29.0.1"; // bump this by hand with each future commit
+      const APP_VERSION = "v30.0.0"; // bump this by hand with each future commit
 
       const NAV_GROUPS = [
         {
@@ -1261,6 +1393,15 @@
           return n > 0 ? String(n) : "";
         }
         if (key === "credit") {
+          if (!isOwner()) {
+            let n2 = 0;
+            (state.receivables || []).forEach((r) => {
+              const b = getReceivableBalance(r);
+              if (b <= 0) return;
+              if (r.due && daysUntil(r.due) < 0) n2++;
+            });
+            return n2 > 0 ? String(n2) : "";
+          }
           let n = 0;
           (state.payables || []).forEach((p) => {
             const b = getPayableBalance(p);
@@ -1329,7 +1470,9 @@
             summary: "Monthly Summary",
           })[v] || v;
         const link = (v, ic, label, extra) =>
-          `<div class="sb-link ${view === v ? "active" : ""}" onclick="navFromSidebar('${v}')"><span class="ic">${ic}</span> ${label}${extra || ""}</div>`;
+          !canView(v)
+            ? ""
+            : `<div class="sb-link ${view === v ? "active" : ""}" onclick="navFromSidebar('${v}')"><span class="ic">${ic}</span> ${label}${extra || ""}</div>`;
         const dot = todayLogged()
           ? ""
           : '<span style="margin-left:auto; width:8px; height:8px; border-radius:50%; background:var(--bad); display:inline-block;"></span>';
@@ -1340,18 +1483,22 @@ ${link("daily", "🗓️", "Today's Entry", dot)}
 ${link("gcash", "📲", "GCash Float")}
 `;
         NAV_GROUPS.forEach((g) => {
-          const containsActive = g.views.includes(view);
+          const visible = g.views.filter(canView);
+          if (!visible.length) return;
+          const containsActive = visible.includes(view);
           const isOpen =
             open[g.key] === undefined ? containsActive : !!open[g.key];
           const badge = groupBadge(g.key);
           html += `<div class="sb-link" onclick="toggleNavGroup('${g.key}')" style="justify-content:space-between;"><span style="display:flex; align-items:center; gap:12px;"><span class="ic">${g.ic}</span> ${g.label}</span><span style="display:flex; align-items:center; gap:8px;">${badge ? `<span class="code-badge" style="margin:0; background:var(--bad); color:#fff;">${badge}</span>` : ""}<span class="chevron ${isOpen ? "open" : ""}">▶</span></span></div>`;
           if (isOpen) {
-            g.views.forEach((v) => {
+            visible.forEach((v) => {
               html += link(v, icOf(v), labelOf(v));
             });
           }
         });
         html += link("datatools", "🧰", "Data Tools");
+        html += link("people", "👥", "People & Roles");
+        html += link("audit", "🕵️", "Audit Log");
         html += link("settings", "⚙️", "Settings");
         html += link("help", "💡", "Help & Tips");
         html += `<div class="sb-version">Tindahan Tracker · ${APP_VERSION}</div>`;
@@ -1594,6 +1741,16 @@ ${link("gcash", "📲", "GCash Float")}
         if (!state.priceAlerts) state.priceAlerts = [];
         if (!state.payables) state.payables = [];
         if (!state.receivables) state.receivables = [];
+        if (!state.people) state.people = [];
+        if (!state.auditLog) state.auditLog = [];
+        if (state.people.length === 0 && (state.registeredUsers || []).length) {
+          state.people = state.registeredUsers.map((n) => ({
+            name: n,
+            role: "Owner",
+            codeHash: null,
+            active: true,
+          }));
+        }
         state.payables.forEach((p) => {
           if (!p.type) p.type = "One-time";
           if (
@@ -1621,6 +1778,8 @@ ${link("gcash", "📲", "GCash Float")}
         gcashLogs: [],
         payables: [],
         receivables: [],
+        people: [],
+        auditLog: [],
         household: DEFAULT_HOUSEHOLD.map((h) => ({ ...h })),
         inventory: [],
         householdHistory: [],
@@ -1856,6 +2015,7 @@ ${link("gcash", "📲", "GCash Float")}
       }
 
       function toggleReadOnly() {
+        if (!requireOwner()) return;
         isReadOnly = !isReadOnly;
         alert(
           isReadOnly
@@ -1935,6 +2095,7 @@ ${link("gcash", "📲", "GCash Float")}
       }
 
       function importAllDataFromFile() {
+        if (!requireOwner()) return;
         if (isReadOnly) {
           alert("Read-only mode is enabled — disable it before importing.");
           return;
@@ -1958,6 +2119,12 @@ ${link("gcash", "📲", "GCash Float")}
           );
           if (!ok) return;
           await exportAllData(); // create a backup first
+          logAudit(
+            "import",
+            "full-state",
+            "",
+            Object.keys(parsed || {}).length + " keys",
+          );
           state = Object.assign({}, parsed);
           await saveState();
           alert(
@@ -2050,9 +2217,15 @@ ${link("gcash", "📲", "GCash Float")}
         try {
           await forwardFn(state);
           await saveState();
+          logAudit(
+            "csv-import",
+            "inventory",
+            "",
+            `${created} created, ${updated} updated`,
+          );
           pushUndo({
             type: "reset-snapshot",
-            label: `Undo migration ${name}`,
+            label: "Undo CSV import",
             snapshot,
           });
           alert(
@@ -2069,14 +2242,14 @@ ${link("gcash", "📲", "GCash Float")}
       }
 
       function go(v) {
-view = v;
-const grp = NAV_GROUPS.find((g) => g.views.includes(v));
-if (grp) {
-const s = navOpenState();
-s[grp.key] = true;
-localStorage.setItem("navOpenGroups", JSON.stringify(s));
-}
-render();
+        view = v;
+        const grp = NAV_GROUPS.find((g) => g.views.includes(v));
+        if (grp) {
+          const s = navOpenState();
+          s[grp.key] = true;
+          localStorage.setItem("navOpenGroups", JSON.stringify(s));
+        }
+        render();
         window.scrollTo(0, 0);
         if (v === "home" || v === "summary") {
           quickRefresh();
@@ -2084,6 +2257,7 @@ render();
       }
 
       function goHistoryProtected() {
+        if (!requireOwner()) return;
         const input = prompt("Enter the History passkey:");
         if (input === null) return; // cancelled
         if (input !== HISTORY_PASSKEY) {
@@ -2093,6 +2267,7 @@ render();
         go("householdHistory");
       }
       function goStockHistoryProtected() {
+        if (!requireOwner()) return;
         const input = prompt("Enter the History passkey:");
         if (input === null) return;
         if (input !== HISTORY_PASSKEY) {
@@ -2124,7 +2299,8 @@ render();
           return;
         }
         let html = "";
-        if (view === "home") html = renderHome();
+        if (view === "home")
+          html = isOwner() ? renderHome() : renderStaffHome();
         else if (view === "daily") html = renderDaily();
         else if (view === "gcash") html = renderGcash();
         else if (view === "payables") html = renderPayables();
@@ -2140,16 +2316,62 @@ render();
         else if (view === "suppliers") html = renderSuppliers();
         else if (view === "datatools") html = renderDataTools();
         else if (view === "settings") html = renderSettings();
+        else if (view === "audit") html = renderAudit();
+        else if (view === "people") html = renderPeople();
         app.innerHTML = html;
         attachHandlers();
         renderSidebar();
         updateNotifBadge();
+        if (
+          loaded &&
+          currentUser &&
+          !personOkForSession() &&
+          !document
+            .getElementById("item-modal-overlay")
+            .classList.contains("open")
+        )
+          ensurePersonCode();
         if (view === "insights") {
           const now = new Date();
           drawInsightCharts(window._selMonth || now.toISOString().slice(0, 7));
         }
       }
 
+      function renderStaffHome() {
+        const low = state.inventory.filter(
+          (r) => Number(r.stock) <= Number(r.reorder),
+        ).length;
+        const exp = state.inventory.filter((r) => {
+          const d = daysUntil(r.expiryDate);
+          return d !== null && d <= 7;
+        }).length;
+        const todayName = WEEKDAYS[new Date().getDay()];
+        const supToday = (state.suppliers || []).filter(
+          (s) => s.scheduleType === "Fixed Day" && s.scheduleDay === todayName,
+        );
+        const sukiDue = (state.receivables || []).filter((r) => {
+          const b = getReceivableBalance(r);
+          if (b <= 0) return false;
+          const d = r.due ? daysUntil(r.due) : null;
+          return d !== null && d <= 3;
+        }).length;
+        return `
+${header("Store Health", "Kalusugan ng Tindahan (Staff view)")}
+<main>
+<div class="banner">Staff view — ang money figures ay nakikita lang ng Owner. ${todayLogged() ? "✅ May entry na ngayong araw." : `⚠️ Wala pang entry ngayong araw — <span style="text-decoration:underline;" onclick="go('daily')">log it now</span>`}</div>
+<div class="section-title">Today's Operations</div>
+<div class="card">
+<div class="sumline"><span>📦 Low stock items</span><b>${low}</b></div>
+<div class="sumline"><span>⏳ Expiring within 7 days</span><b>${exp}</b></div>
+<div class="sumline"><span>🚚 Suppliers scheduled today</span><b>${supToday.length ? escapeHtml(supToday.map((s) => s.name).join(", ")) : "None"}</b></div>
+<div class="sumline"><span>🤝 Suki due within 3 days</span><b>${sukiDue}</b></div>
+</div>
+<div class="section-title">Quick Actions</div>
+<button class="btn" style="width:100%; background:var(--teal); color:#fff;" onclick="go('daily')">🗓️ Today's Entry</button>
+<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="go('inventory')">📦 Inventory</button>
+<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="go('receivables')">🤝 Suki Utang</button>
+</main>`;
+      }
       function renderHome() {
         const now = new Date();
         const defaultMonth = now.toISOString().slice(0, 7);
@@ -2260,26 +2482,26 @@ render();
         const tgl = (key, on) =>
           `<button class="btn" style="padding:8px 16px; font-size:13px; background:${on ? "var(--teal)" : "var(--page-line)"}; color:${on ? "#fff" : "var(--ink)"};" onclick="setPref('${key}', ${!on})">${on ? "ON" : "OFF"}</button>`;
         return `
-${header("Settings", "Mga Setting ng App (per device)", true)}
-<main>
-<div class="banner">Settings are saved on this device only — hiwalay ang setting ng bawat telepono o laptop.</div>
-<div class="card">
-${row("Text Size", "🔠", tgl("bigText", p.bigText))}
-${row("Dark Mode", "🌙", tgl("dark", p.dark))}
-${row("Reduced Motion", "🎬", tgl("noMotion", p.noMotion))}
-${row("Always Show Input Hints", "💬", tgl("showHints", p.showHints))}
-</div>
-<div class="section-title">Security</div>
-<div class="card">
-${row("Auto-lock after idle", "🔒", `<select onchange="setPref('lockMins', Number(this.value))" style="width:auto; padding:8px 10px; font-size:13px;">${[5, 15, 30, 60].map((m) => `<option value="${m}" ${p.lockMins === m ? "selected" : ""}>${m} min</option>`).join("")}</select>`)}
-<div class="sumline"><span>🛡️ PIN lockout</span><b>3 wrong tries = 60s cooldown</b></div>
-</div>
-<div class="section-title">About</div>
-<div class="card">
-<div class="sumline"><span>Version</span><b>${APP_VERSION}</b></div>
-<div class="sumline"><span>Printer / barcode setup</span><b>Parked — waiting for hardware</b></div>
-</div>
-</main>`;
+        ${header("Settings", "Mga Setting ng App (per device)", true)}
+        <main>
+        <div class="banner">Settings are saved on this device only — hiwalay ang setting ng bawat telepono o laptop.</div>
+        <div class="card">
+        ${row("Text Size", "🔠", tgl("bigText", p.bigText))}
+        ${row("Dark Mode", "🌙", tgl("dark", p.dark))}
+        ${row("Reduced Motion", "🎬", tgl("noMotion", p.noMotion))}
+        ${row("Always Show Input Hints", "💬", tgl("showHints", p.showHints))}
+        </div>
+        <div class="section-title">Security</div>
+        <div class="card">
+        ${row("Auto-lock after idle", "🔒", `<select onchange="setPref('lockMins', Number(this.value))" style="width:auto; padding:8px 10px; font-size:13px;">${[5, 15, 30, 60].map((m) => `<option value="${m}" ${p.lockMins === m ? "selected" : ""}>${m} min</option>`).join("")}</select>`)}
+        <div class="sumline"><span>🛡️ PIN lockout</span><b>3 wrong tries = 60s cooldown</b></div>
+        </div>
+        <div class="section-title">About</div>
+        <div class="card">
+        <div class="sumline"><span>Version</span><b>${APP_VERSION}</b></div>
+        <div class="sumline"><span>Printer / barcode setup</span><b>Parked — waiting for hardware</b></div>
+        </div>
+        </main>`;
       }
       function showInfo(text) {
         const pop = document.getElementById("info-pop");
@@ -2295,6 +2517,168 @@ ${row("Auto-lock after idle", "🔒", `<select onchange="setPref('lockMins', Num
         if (pop && pop.style.display === "block") pop.style.display = "none";
       });
       setTimeout(applyPrefs, 0); // defer until after the let-declarations below are initialized
+
+      function renderPeople() {
+        if (!requireOwner()) return `<div class="empty">Owner-only.</div>`;
+        const rows = state.people || [];
+        return `
+${header("People & Roles", "Mga Tao at Papel sa Tindahan", true)}
+<main>
+<div class="card">
+<div style="display:flex; gap:8px;">
+<input type="text" id="pp-name" placeholder="Add person name…" style="flex:1;">
+<select id="pp-role" style="width:auto;">
+<option value="Staff">Staff</option>
+<option value="Owner">Owner</option>
+</select>
+<button class="btn" style="background:var(--brass); color:#fff;" onclick="addPerson()">+</button>
+</div>
+<p class="subtitle" style="margin:8px 0 0;">New people set their 4-digit code on their next login. Default role: Staff.</p>
+</div>
+<div class="section-title">People</div>
+<div class="card">
+${
+  rows.length === 0
+    ? `<div class="empty">Walang tao pa.</div>`
+    : rows
+        .map(
+          (p, i) => `
+          <div class="entry">
+          <div>
+          <div><b>${escapeHtml(p.name)}</b> <span class="pill ${p.role === "Owner" ? "paid" : "unpaid"}">${p.role}</span> ${p.active ? "" : `<span class="pill overdue">Inactive</span>`}</div>
+          <div class="meta">${p.codeHash ? "Code set ✓" : "No code yet"}${p.name === currentUser ? " · this device" : ""}</div>
+          </div>
+          <div style="display:flex; gap:6px; justify-content:flex-end; flex-wrap:wrap;">
+          <button class="btn btn-ghost" style="border-color:var(--teal); color:var(--teal); padding:5px 10px; font-size:12px;" onclick="togglePersonRole(${i})">${p.role === "Owner" ? "Demote to Staff" : "Promote to Owner"}</button>
+          <button class="btn btn-ghost" style="padding:5px 10px; font-size:12px;" onclick="resetPersonCode(${i})">Reset code</button>
+          <button class="btn btn-ghost" style="padding:5px 10px; font-size:12px;" onclick="togglePersonActive(${i})">${p.active ? "Deactivate" : "Activate"}</button>
+          </div>
+          </div>`,
+        )
+        .join("")
+}
+</div>
+</main>`;
+      }
+      function addPerson() {
+        if (!requireOwner()) return;
+        const name = (document.getElementById("pp-name").value || "").trim();
+        if (!name) return;
+        if (
+          (state.people || []).some(
+            (p) => p.name.toLowerCase() === name.toLowerCase(),
+          )
+        ) {
+          alert("Name already exists.");
+          return;
+        }
+        if (!state.registeredUsers) state.registeredUsers = [];
+        if (!state.registeredUsers.includes(name))
+          state.registeredUsers.push(name);
+        const role = document.getElementById("pp-role").value;
+        state.people.push({ name, role, codeHash: null, active: true });
+        logAudit("person-add", name, "", role);
+        saveState();
+        render();
+      }
+      function togglePersonRole(i) {
+        if (!requireOwner()) return;
+        const p = state.people[i];
+        const old = p.role;
+        p.role = p.role === "Owner" ? "Staff" : "Owner";
+        logAudit("person-role", p.name, old, p.role);
+        saveState();
+        render();
+      }
+      function resetPersonCode(i) {
+        if (!requireOwner()) return;
+        const p = state.people[i];
+        p.codeHash = null;
+        if (p.name === currentUser) sessionStorage.removeItem("personOk");
+        logAudit("person-code-reset", p.name, "set", "none");
+        saveState();
+        render();
+      }
+      function togglePersonActive(i) {
+        if (!requireOwner()) return;
+        const p = state.people[i];
+        if (p.name === currentUser) {
+          alert("You cannot deactivate yourself.");
+          return;
+        }
+        p.active = !p.active;
+        logAudit(
+          p.active ? "person-activate" : "person-deactivate",
+          p.name,
+          "",
+          "",
+        );
+        saveState();
+        render();
+      }
+      function renderAudit() {
+        if (!requireOwner()) return `<div class="empty">Owner-only.</div>`;
+        const rows = [...(state.auditLog || [])].reverse();
+        const people = [...new Set(rows.map((r) => r.by))];
+        const actions = [...new Set(rows.map((r) => r.action))];
+        const fBy = window._auditBy || "All";
+        const fAct = window._auditAct || "All";
+        const filtered = rows.filter(
+          (r) =>
+            (fBy === "All" || r.by === fBy) &&
+            (fAct === "All" || r.action === fAct),
+        );
+        return `
+${header("Audit Log", "Sino ang gumawa ng ano", true)}
+<main>
+<div class="filter-row">
+<select onchange="setAuditBy(this.value)" style="flex:1;">
+<option value="All">All people</option>
+${people.map((p) => `<option value="${escapeHtml(p)}" ${fBy === p ? "selected" : ""}>${escapeHtml(p)}</option>`).join("")}
+</select>
+<select onchange="setAuditAct(this.value)" style="flex:1;">
+<option value="All">All actions</option>
+${actions.map((a) => `<option value="${escapeHtml(a)}" ${fAct === a ? "selected" : ""}>${escapeHtml(a)}</option>`).join("")}
+</select>
+</div>
+<div style="display:flex; gap:8px; margin-bottom:10px;">
+<button class="btn" style="flex:1; background:transparent; border:1.5px solid var(--teal); color:var(--teal); padding:10px; font-size:13px;" onclick="exportRowsCsv('auditLog')">⬇ Export CSV</button>
+</div>
+<div class="card">
+${
+  filtered.length === 0
+    ? `<div class="empty">Walang audit entries.</div>`
+    : filtered
+        .slice(0, 200)
+        .map((r) => {
+          const dt = new Date(r.time);
+          const dtStr = dt.toLocaleString("en-PH", {
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          });
+          return `<div class="entry">
+<div>
+<div><b>${escapeHtml(r.action)}</b> · ${escapeHtml(r.target)}</div>
+<div class="meta">${escapeHtml(r.by)} · ${dtStr}${r.old || r.new ? ` · ${escapeHtml(r.old)} → ${escapeHtml(r.new)}` : ""}</div>
+</div>
+</div>`;
+        })
+        .join("")
+}
+</div>
+<p class="subtitle">Last 400 actions only; exports include the full log.</p>
+</main>`;
+      }
+      function setAuditBy(v) {
+        window._auditBy = v;
+        render();
+      }
+      function setAuditAct(v) {
+        window._auditAct = v;
+        render();
+      }
       function renderDataTools() {
         return `
 ${header("Data Tools", "Export, Import, at Reset", true)}
@@ -2336,6 +2720,7 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
 </main>`;
       }
       function resetData() {
+        if (!requireOwner()) return;
         const ok = confirm(
           "This will permanently delete Daily Entries, Gcash logs, and Loans, and zero out household 'actual' spending. Top Items will NOT be touched. Continue?",
         );
@@ -2346,6 +2731,12 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
           label: "Restore full state (reset)",
           snapshot,
         });
+        logAudit(
+          "reset",
+          "clean-slate",
+          `daily ${state.dailyLogs.length}, gcash ${state.gcashLogs.length}, payables ${state.payables.length}`,
+          "",
+        );
         state.dailyLogs = [];
         state.gcashLogs = [];
         state.payables = [];
@@ -2850,6 +3241,7 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
           type === "Consignment" ? "" : "none";
       }
       function addPayable() {
+        if (!requireOwner()) return;
         const type = document.getElementById("p-type").value;
         const item = document.getElementById("p-item").value.trim();
 
@@ -2917,14 +3309,28 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
             loggedBy: currentUser,
           });
         }
+        const np = state.payables[state.payables.length - 1];
+        logAudit(
+          "payable-create",
+          np.name,
+          "",
+          `${np.type} ${np.amt || np.totalAmt || ""}`,
+        );
         saveState();
         render();
       }
       function markPaid(idx) {
+        if (!requireOwner()) return;
         const ok = confirm(
           "Sigurado ka ba? Markahan itong bayad na. \n\nAre you sure? This will mark it as paid.",
         );
         if (!ok) return;
+        logAudit(
+          "payable-markpaid",
+          state.payables[idx].name,
+          "Unpaid",
+          "Paid",
+        );
         state.payables[idx].status = "Paid";
         saveState();
         render();
@@ -2960,6 +3366,7 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
         document.getElementById("item-modal-overlay").classList.add("open");
       }
       function submitLoanPayment(idx) {
+        if (!requireOwner()) return;
         const p = state.payables[idx];
         const amount = parseFloat(document.getElementById("lp-amt").value);
         const date = document.getElementById("lp-date").value || todayStr();
@@ -2970,6 +3377,7 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
         if (!p.history) p.history = [];
         const kind = p.type === "One-time" ? "payment" : "remittance";
         p.history.push({ date, amount, by: currentUser, kind });
+        logAudit("payable-payment", p.name, "", String(amount));
         if (p.type === "One-time" && getPayableBalance(p) <= 0) {
           p.status = "Paid"; // partial payments covered the full amount
         }
@@ -3078,6 +3486,8 @@ ${balance > 0 ? `<button class="btn btn-ghost" style="border-color:var(--good); 
           history: [],
           loggedBy: currentUser,
         });
+        const nr = state.receivables[state.receivables.length - 1];
+        logAudit("receivable-create", nr.name, "", String(nr.amt));
         saveState();
         render();
       }
@@ -3119,6 +3529,7 @@ ${[...r.history]
         }
         if (!r.history) r.history = [];
         r.history.push({ date, amount, by: currentUser, kind: "payment" });
+        logAudit("receivable-payment", r.name, "", String(amount));
         if (getReceivableBalance(r) <= 0) {
           r.status = "Paid";
         }
@@ -3131,6 +3542,12 @@ ${[...r.history]
           "Kumpleto nang nabayad ng suki? \n\nMark this suki utang as fully collected?",
         );
         if (!ok) return;
+        logAudit(
+          "receivable-collected",
+          state.receivables[idx].name,
+          "Unpaid",
+          "Paid",
+        );
         state.receivables[idx].status = "Paid";
         saveState();
         render();
@@ -3380,6 +3797,7 @@ ${[...r.history]
         render();
       }
       function updHousehold(i, field, val) {
+        if (!requireOwner()) return;
         const oldVal = Number(state.household[i][field]) || 0;
         const parsed = parseFloat(val);
         const newVal = isNaN(parsed) ? 0 : parsed;
@@ -3439,6 +3857,7 @@ ${[...r.history]
       }
 
       function applyHouseholdAdjust(i, signedAmt) {
+        if (!requireOwner()) return;
         const oldVal = Number(state.household[i].actual) || 0;
         const newVal = Math.max(0, oldVal + signedAmt);
         if (!state.householdHistory) state.householdHistory = [];
@@ -3463,6 +3882,7 @@ ${[...r.history]
       }
 
       function delHouseholdCat(i) {
+        if (!requireOwner()) return;
         const catName = state.household[i].cat;
         const ok = confirm(
           `Alisin ang "${catName}" sa listahan?\n\nRemove "${catName}" from the list? Past history stays, only future tracking stops.`,
@@ -4622,6 +5042,7 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
       }
 
       function openItemModal(editIndex) {
+        if (!requireOwner()) return;
         itemModalEditIndex = editIndex === undefined ? null : editIndex;
         const item =
           itemModalEditIndex !== null
@@ -4693,6 +5114,7 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
       }
 
       function saveItemForm() {
+        if (!requireOwner()) return;
         const name = document.getElementById("im-name").value.trim();
         if (!name) {
           alert("Item name is required.");
@@ -4753,9 +5175,17 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
 
         if (itemModalEditIndex === null) {
           data.code = generateProductCode(category);
+          logAudit("item-create", data.name, "", data.code);
           state.inventory.push(data);
         } else {
-          data.code = state.inventory[itemModalEditIndex].code;
+          const oldIt = state.inventory[itemModalEditIndex];
+          logAudit(
+            "item-edit",
+            data.name,
+            `cost ${oldIt.cost}/price ${oldIt.price}/stock ${oldIt.stock}`,
+            `cost ${data.cost}/price ${data.price}/stock ${data.stock}`,
+          );
+          data.code = oldIt.code;
           state.inventory[itemModalEditIndex] = data;
         }
         saveState();
@@ -4919,6 +5349,7 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
       }
 
       function openSupplierPriceModal(itemIdx) {
+        if (!requireOwner()) return;
         const item = state.inventory[itemIdx];
         const sheet = document.getElementById("item-modal-sheet");
         if (state.suppliers.length === 0) {
@@ -4953,6 +5384,7 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
       }
 
       function submitSupplierPrice(itemIdx) {
+        if (!requireOwner()) return;
         const item = state.inventory[itemIdx];
         const supplier = document.getElementById("sp-supplier").value;
         const price = parseFloat(document.getElementById("sp-price").value);
@@ -4973,6 +5405,12 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
             acknowledged: false,
           });
         }
+        logAudit(
+          "price-change",
+          item.name,
+          prior ? String(prior.price) : "",
+          String(price),
+        );
         item.supplierPrices.push({
           supplier,
           price,
@@ -5671,6 +6109,9 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
     
     <div class="help-h">📦 Bulk Inventory (CSV)</div>
     <p class="help-p"><b>Export Product List (CSV)</b> — buksan sa Excel, i-edit ang presyo o stock, save, then <b>Import CSV</b>. Blank cell = walang babaguhin; CLEAR = burahin ang field. Bago ma-apply, makikita mo muna ang review: Create / Update / Needs decision / Errors. Ang magkakaparehong pangalan (kahit mali ang spelling) ay itatanong muna bago gagawin.</p>
+    <div class="help-h">👥 People & Roles</div>
+<p class="help-p"><b>People & Roles</b> — Owner ang nakakakita ng lahat (kita, household, Data Tools, Audit). Staff: Today's Entry, GCash, Inventory operations, Suki Utang, at Settings comfort lang. Bawat tao may sariling 4-digit code; hash lang ang naka-store, hindi plaintext.</p>
+<p class="help-p"><b>🕵️ Audit Log</b> — owner-only list kung sino ang gumawa ng ano (delete, edit, payment, import, reset), may old → new values. Last 400 actions; may CSV export.</p>
     <div class="help-h">⚙️ Settings</div>
 <p class="help-p"><b>Settings</b> — buksan ang menu (☰) at pindutin ang ⚙️ Settings: Text Size, Dark Mode, Reduced Motion, Always Show Input Hints, at Auto-lock time. Naka-save per device ang bawat setting.</p>
 <p class="help-p"><b>🛡️ PIN lockout</b> — pag mali ang PIN ng 3 beses, may countdown (60s, mas matagal kapag inulit) bago makasubok ulit.</p>
@@ -5682,6 +6123,14 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
 
       function delItem(key, idx) {
         if (idx < 0) return;
+        if (
+          (key === "payables" ||
+            key === "receivables" ||
+            key === "inventory" ||
+            key === "suppliers") &&
+          !requireOwner()
+        )
+          return;
         const ok = confirm(
           "Sigurado ka ba? Tatanggalin ito. \n\nAre you sure? This will delete this entry.",
         );
@@ -5694,6 +6143,12 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
           idx,
           item,
         });
+        logAudit(
+          "delete",
+          key + "[" + idx + "]",
+          JSON.stringify(item).slice(0, 120),
+          "",
+        );
         state[key].splice(idx, 1);
         saveState();
         render();
