@@ -783,30 +783,73 @@
           min-width: 0;
         }
       }
-      :root{ --card:#FFFFFF; --input-bg:#FEFDFA; }
-body.dark-mode{
---page:#141518;
---cover:#000000;
---cover-dark:#000000;
---ink:#F3F4F6;
---ink-soft:#9CA3AF;
---page-line:#2B2E33;
---brass:#F3F4F6;
---brass-light:#7A8087;
---card:#1B1D22;
---input-bg:#23262C;
---accent-soft:#221A31;
---accent-soft-border:#3D2F58;
---accent-soft-text:#C4B5FD;
---good-bg:#122A20;
---bad-bg:#2E1613;
-}
-body.dark-mode #sidebar, body.dark-mode .sb-link{ color:#F3F4F6; }
-body.dark-mode #lock-screen, body.dark-mode #username-screen{ color:#F3F4F6; }
-.info-i{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink-soft);color:var(--ink-soft);font-size:11px;font-style:normal;font-weight:700;margin-left:6px;cursor:pointer;vertical-align:middle;}
-#info-pop{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:995;background:var(--ink);color:var(--page);padding:12px 16px;border-radius:12px;font-size:13.5px;line-height:1.5;max-width:440px;display:none;box-shadow:0 4px 16px rgba(0,0,0,.35);}
-.hint-opt{display:none;}
-body.show-hints .hint-opt{display:block;}
+      :root {
+        --card: #ffffff;
+        --input-bg: #fefdfa;
+      }
+      body.dark-mode {
+        --page: #141518;
+        --cover: #000000;
+        --cover-dark: #000000;
+        --ink: #f3f4f6;
+        --ink-soft: #9ca3af;
+        --page-line: #2b2e33;
+        --brass: #f3f4f6;
+        --brass-light: #7a8087;
+        --card: #1b1d22;
+        --input-bg: #23262c;
+        --accent-soft: #221a31;
+        --accent-soft-border: #3d2f58;
+        --accent-soft-text: #c4b5fd;
+        --good-bg: #122a20;
+        --bad-bg: #2e1613;
+      }
+      body.dark-mode #sidebar,
+      body.dark-mode .sb-link {
+        color: #f3f4f6;
+      }
+      body.dark-mode #lock-screen,
+      body.dark-mode #username-screen {
+        color: #f3f4f6;
+      }
+      .info-i {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 1.5px solid var(--ink-soft);
+        color: var(--ink-soft);
+        font-size: 11px;
+        font-style: normal;
+        font-weight: 700;
+        margin-left: 6px;
+        cursor: pointer;
+        vertical-align: middle;
+      }
+      #info-pop {
+        position: fixed;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: 24px;
+        z-index: 995;
+        background: var(--ink);
+        color: var(--page);
+        padding: 12px 16px;
+        border-radius: 12px;
+        font-size: 13.5px;
+        line-height: 1.5;
+        max-width: 440px;
+        display: none;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+      }
+      .hint-opt {
+        display: none;
+      }
+      body.show-hints .hint-opt {
+        display: block;
+      }
     </style>
   </head>
   <body>
@@ -945,53 +988,65 @@ body.show-hints .hint-opt{display:block;}
       const STORE_PIN = "2808";
       const HISTORY_PASSKEY = "2806";
 
-      function pinLockRemaining(){
-const until = Number(localStorage.getItem('pinLockUntil')||0);
-return Math.max(0, until - Date.now());
-}
-let pinCountdownTimer = null;
-function startPinCountdown(){
-if(pinCountdownTimer) clearInterval(pinCountdownTimer);
-pinCountdownTimer = setInterval(()=>{
-const ms = pinLockRemaining();
-const le = document.getElementById('lock-error');
-if(ms <= 0){
-clearInterval(pinCountdownTimer); pinCountdownTimer = null;
-if(le) le.textContent = '';
-return;
-}
-if(le) le.textContent = 'Too many wrong tries — try again in ' + Math.ceil(ms/1000) + 's';
-}, 1000);
-}
-function notePinFail(){
-const fails = Number(localStorage.getItem('pinFails')||0) + 1;
-if(fails >= 3){
-const stage = Number(localStorage.getItem('pinLockStage')||0);
-const esc = Math.min(30*60*1000, 60*1000 * Math.pow(2, stage));
-localStorage.setItem('pinLockStage', String(stage+1));
-localStorage.setItem('pinLockUntil', String(Date.now() + esc));
-localStorage.setItem('pinFails', '0');
-startPinCountdown();
-} else {
-localStorage.setItem('pinFails', String(fails));
-}
-}
-function checkPin(){
-if(pinLockRemaining() > 0){ startPinCountdown(); return; }
+      function pinLockRemaining() {
+        const until = Number(localStorage.getItem("pinLockUntil") || 0);
+        return Math.max(0, until - Date.now());
+      }
+      let pinCountdownTimer = null;
+      function startPinCountdown() {
+        if (pinCountdownTimer) clearInterval(pinCountdownTimer);
+        pinCountdownTimer = setInterval(() => {
+          const ms = pinLockRemaining();
+          const le = document.getElementById("lock-error");
+          if (ms <= 0) {
+            clearInterval(pinCountdownTimer);
+            pinCountdownTimer = null;
+            if (le) le.textContent = "";
+            return;
+          }
+          if (le)
+            le.textContent =
+              "Too many wrong tries — try again in " +
+              Math.ceil(ms / 1000) +
+              "s";
+        }, 1000);
+      }
+      function notePinFail() {
+        const fails = Number(localStorage.getItem("pinFails") || 0) + 1;
+        if (fails >= 3) {
+          const stage = Number(localStorage.getItem("pinLockStage") || 0);
+          const esc = Math.min(30 * 60 * 1000, 60 * 1000 * Math.pow(2, stage));
+          localStorage.setItem("pinLockStage", String(stage + 1));
+          localStorage.setItem("pinLockUntil", String(Date.now() + esc));
+          localStorage.setItem("pinFails", "0");
+          startPinCountdown();
+        } else {
+          localStorage.setItem("pinFails", String(fails));
+        }
+      }
+      function checkPin() {
+        if (pinLockRemaining() > 0) {
+          startPinCountdown();
+          return;
+        }
         const val = document.getElementById("lock-input").value;
         if (val === STORE_PIN) {
-          localStorage.setItem('pinFails','0');
-localStorage.setItem('pinLockUntil','0');
-if(pinCountdownTimer){ clearInterval(pinCountdownTimer); pinCountdownTimer=null; }
-localStorage.setItem('storeUnlocked', 'true');
+          localStorage.setItem("pinFails", "0");
+          localStorage.setItem("pinLockUntil", "0");
+          if (pinCountdownTimer) {
+            clearInterval(pinCountdownTimer);
+            pinCountdownTimer = null;
+          }
+          localStorage.setItem("storeUnlocked", "true");
           document.getElementById("lock-screen").style.display = "none";
           startApp();
         } else {
           notePinFail();
-if(pinLockRemaining() <= 0){
-const left = 3 - Number(localStorage.getItem('pinFails')||0);
-document.getElementById('lock-error').textContent = 'Wrong PIN - try again (' + left + ' tries left)';
-}
+          if (pinLockRemaining() <= 0) {
+            const left = 3 - Number(localStorage.getItem("pinFails") || 0);
+            document.getElementById("lock-error").textContent =
+              "Wrong PIN - try again (" + left + " tries left)";
+          }
           document.getElementById("lock-input").value = "";
         }
       }
@@ -1151,7 +1206,7 @@ document.getElementById('lock-error').textContent = 'Wrong PIN - try again (' + 
         "Saturday",
       ];
 
-      const APP_VERSION = "v29.0.0"; // bump this by hand with each future commit
+      const APP_VERSION = "v29.0.1"; // bump this by hand with each future commit
 
       const NAV_GROUPS = [
         {
@@ -1281,7 +1336,7 @@ document.getElementById('lock-error').textContent = 'Wrong PIN - try again (' + 
         let html = `
 <div class="sb-user" style="cursor:pointer;" onclick="renderUserPanel()">👤 ${escapeHtml(currentUser || "—")} <span style="font-size:11px; opacity:.7; margin-left:auto;">(tap for panel)</span></div>
 ${link("home", "🏠", "Store Health")}
-${link("daily", "️", "Today's Entry", dot)}
+${link("daily", "🗓️", "Today's Entry", dot)}
 ${link("gcash", "📲", "GCash Float")}
 `;
         NAV_GROUPS.forEach((g) => {
@@ -1297,7 +1352,7 @@ ${link("gcash", "📲", "GCash Float")}
           }
         });
         html += link("datatools", "🧰", "Data Tools");
-        html += link('settings','⚙️','Settings');
+        html += link("settings", "⚙️", "Settings");
         html += link("help", "💡", "Help & Tips");
         html += `<div class="sb-version">Tindahan Tracker · ${APP_VERSION}</div>`;
         sb.innerHTML = html;
@@ -2014,8 +2069,14 @@ ${link("gcash", "📲", "GCash Float")}
       }
 
       function go(v) {
-        view = v;
-        render();
+view = v;
+const grp = NAV_GROUPS.find((g) => g.views.includes(v));
+if (grp) {
+const s = navOpenState();
+s[grp.key] = true;
+localStorage.setItem("navOpenGroups", JSON.stringify(s));
+}
+render();
         window.scrollTo(0, 0);
         if (v === "home" || v === "summary") {
           quickRefresh();
@@ -2078,7 +2139,7 @@ ${link("gcash", "📲", "GCash Float")}
         else if (view === "expansion") html = renderExpansion();
         else if (view === "suppliers") html = renderSuppliers();
         else if (view === "datatools") html = renderDataTools();
-        else if(view==="settings") html = renderSettings();
+        else if (view === "settings") html = renderSettings();
         app.innerHTML = html;
         attachHandlers();
         renderSidebar();
@@ -2147,52 +2208,70 @@ ${link("gcash", "📲", "GCash Float")}
   </main>`;
       }
 
-      const PREFS_KEY = 'tindahanPrefs';
-function getPrefs(){
-try{
-const p = JSON.parse(localStorage.getItem(PREFS_KEY)||'{}');
-if(p.bigText===undefined) p.bigText = localStorage.getItem('storeBigText')==='1';
-if(p.noMotion===undefined) p.noMotion = localStorage.getItem('storeNoMotion')==='1';
-if(p.dark===undefined) p.dark = false;
-if(p.showHints===undefined) p.showHints = false;
-if(p.lockMins===undefined) p.lockMins = 15;
-return p;
-}catch(e){ return {bigText:false,noMotion:false,dark:false,showHints:false,lockMins:15}; }
-}
-function savePrefs(p){ localStorage.setItem(PREFS_KEY, JSON.stringify(p)); }
-function applyPrefs(){
-const p = getPrefs();
-document.body.classList.toggle('big-text', !!p.bigText);
-document.body.classList.toggle('no-motion', !!p.noMotion);
-document.body.classList.toggle('dark-mode', !!p.dark);
-document.body.classList.toggle('show-hints', !!p.showHints);
-if(window.Chart){
-Chart.defaults.color = p.dark ? '#9CA3AF' : '#6B6B6B';
-Chart.defaults.borderColor = p.dark ? '#2B2E33' : 'rgba(0,0,0,0.1)';
-}
-INACTIVITY_LOCK_MS = p.lockMins * 60 * 1000;
-resetInactivityTimer();
-}
-function setPref(key, val){
-const p = getPrefs(); p[key] = val; savePrefs(p); applyPrefs(); render();
-}
-function renderSettings(){
-const p = getPrefs();
-const row = (label, ic, control) => `<div class="sumline" style="align-items:center;"><span>${ic} ${label}</span>${control}</div>`;
-const tgl = (key, on) => `<button class="btn" style="padding:8px 16px; font-size:13px; background:${on?'var(--teal)':'var(--page-line)'}; color:${on?'#fff':'var(--ink)'};" onclick="setPref('${key}', ${!on})">${on?'ON':'OFF'}</button>`;
-return `
-${header("Settings","Mga Setting ng App (per device)", true)}
+      const PREFS_KEY = "tindahanPrefs";
+      function getPrefs() {
+        try {
+          const p = JSON.parse(localStorage.getItem(PREFS_KEY) || "{}");
+          if (p.bigText === undefined)
+            p.bigText = localStorage.getItem("storeBigText") === "1";
+          if (p.noMotion === undefined)
+            p.noMotion = localStorage.getItem("storeNoMotion") === "1";
+          if (p.dark === undefined) p.dark = false;
+          if (p.showHints === undefined) p.showHints = false;
+          if (p.lockMins === undefined) p.lockMins = 15;
+          return p;
+        } catch (e) {
+          return {
+            bigText: false,
+            noMotion: false,
+            dark: false,
+            showHints: false,
+            lockMins: 15,
+          };
+        }
+      }
+      function savePrefs(p) {
+        localStorage.setItem(PREFS_KEY, JSON.stringify(p));
+      }
+      function applyPrefs() {
+        const p = getPrefs();
+        document.body.classList.toggle("big-text", !!p.bigText);
+        document.body.classList.toggle("no-motion", !!p.noMotion);
+        document.body.classList.toggle("dark-mode", !!p.dark);
+        document.body.classList.toggle("show-hints", !!p.showHints);
+        if (window.Chart) {
+          Chart.defaults.color = p.dark ? "#9CA3AF" : "#6B6B6B";
+          Chart.defaults.borderColor = p.dark ? "#2B2E33" : "rgba(0,0,0,0.1)";
+        }
+        INACTIVITY_LOCK_MS = p.lockMins * 60 * 1000;
+        resetInactivityTimer();
+      }
+      function setPref(key, val) {
+        const p = getPrefs();
+        p[key] = val;
+        savePrefs(p);
+        applyPrefs();
+        render();
+      }
+      function renderSettings() {
+        const p = getPrefs();
+        const row = (label, ic, control) =>
+          `<div class="sumline" style="align-items:center;"><span>${ic} ${label}</span>${control}</div>`;
+        const tgl = (key, on) =>
+          `<button class="btn" style="padding:8px 16px; font-size:13px; background:${on ? "var(--teal)" : "var(--page-line)"}; color:${on ? "#fff" : "var(--ink)"};" onclick="setPref('${key}', ${!on})">${on ? "ON" : "OFF"}</button>`;
+        return `
+${header("Settings", "Mga Setting ng App (per device)", true)}
 <main>
 <div class="banner">Settings are saved on this device only — hiwalay ang setting ng bawat telepono o laptop.</div>
 <div class="card">
-${row('Text Size','🔠', tgl('bigText', p.bigText))}
-${row('Dark Mode','🌙', tgl('dark', p.dark))}
-${row('Reduced Motion','🎬', tgl('noMotion', p.noMotion))}
-${row('Always Show Input Hints','💬', tgl('showHints', p.showHints))}
+${row("Text Size", "🔠", tgl("bigText", p.bigText))}
+${row("Dark Mode", "🌙", tgl("dark", p.dark))}
+${row("Reduced Motion", "🎬", tgl("noMotion", p.noMotion))}
+${row("Always Show Input Hints", "💬", tgl("showHints", p.showHints))}
 </div>
 <div class="section-title">Security</div>
 <div class="card">
-${row('Auto-lock after idle','🔒', `<select onchange="setPref('lockMins', Number(this.value))" style="width:auto; padding:8px 10px; font-size:13px;">${[5,15,30,60].map(m=>`<option value="${m}" ${p.lockMins===m?'selected':''}>${m} min</option>`).join('')}</select>`)}
+${row("Auto-lock after idle", "🔒", `<select onchange="setPref('lockMins', Number(this.value))" style="width:auto; padding:8px 10px; font-size:13px;">${[5, 15, 30, 60].map((m) => `<option value="${m}" ${p.lockMins === m ? "selected" : ""}>${m} min</option>`).join("")}</select>`)}
 <div class="sumline"><span>🛡️ PIN lockout</span><b>3 wrong tries = 60s cooldown</b></div>
 </div>
 <div class="section-title">About</div>
@@ -2201,19 +2280,21 @@ ${row('Auto-lock after idle','🔒', `<select onchange="setPref('lockMins', Numb
 <div class="sumline"><span>Printer / barcode setup</span><b>Parked — waiting for hardware</b></div>
 </div>
 </main>`;
-}
-function showInfo(text){
-const pop = document.getElementById('info-pop');
-pop.textContent = text;
-pop.style.display = 'block';
-clearTimeout(showInfo._t);
-showInfo._t = setTimeout(()=>{ pop.style.display='none'; }, 7000);
-}
-document.addEventListener('click', ()=>{
-const pop = document.getElementById('info-pop');
-if(pop && pop.style.display==='block') pop.style.display='none';
-});
-applyPrefs();
+      }
+      function showInfo(text) {
+        const pop = document.getElementById("info-pop");
+        pop.textContent = text;
+        pop.style.display = "block";
+        clearTimeout(showInfo._t);
+        showInfo._t = setTimeout(() => {
+          pop.style.display = "none";
+        }, 7000);
+      }
+      document.addEventListener("click", () => {
+        const pop = document.getElementById("info-pop");
+        if (pop && pop.style.display === "block") pop.style.display = "none";
+      });
+      setTimeout(applyPrefs, 0); // defer until after the let-declarations below are initialized
       function renderDataTools() {
         return `
 ${header("Data Tools", "Export, Import, at Reset", true)}
