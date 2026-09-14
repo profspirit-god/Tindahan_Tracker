@@ -1089,7 +1089,7 @@
         "Saturday",
       ];
 
-      const APP_VERSION = "v28.7.2"; // bump this by hand with each future commit
+      const APP_VERSION = "v28.8.0"; // bump this by hand with each future commit
 
       const NAV_ITEMS = [
         { view: "daily", ic: "🗓️", label: "Today's Entry" },
@@ -3430,7 +3430,28 @@ ${[...r.history]
         }
         return prev[n];
       }
-      function parseCsv(text) {
+      function detectCsvDelimiter(text) {
+        const clean = text.replace(/^\uFEFF/, "");
+        const firstLine =
+          clean.split(/\r?\n/).find((l) => l.trim() !== "") || "";
+        let best = ",",
+          bestCount = -1;
+        [",", ";", "\t"].forEach((d) => {
+          let n = 0,
+            inQ = false;
+          for (let i = 0; i < firstLine.length; i++) {
+            const ch = firstLine[i];
+            if (ch === '"') inQ = !inQ;
+            else if (ch === d && !inQ) n++;
+          }
+          if (n > bestCount) {
+            bestCount = n;
+            best = d;
+          }
+        });
+        return best;
+      }
+      function parseCsv(text, delim) {
         text = text.replace(/^\uFEFF/, "");
         const rows = [];
         let row = [],
@@ -3447,21 +3468,21 @@ ${[...r.history]
             } else cur += ch;
           } else {
             if (ch === '"') inQ = true;
-            else if (ch === ",") {
+            else if (ch === delim) {
               row.push(cur);
               cur = "";
             } else if (ch === "\n" || ch === "\r") {
               if (ch === "\r" && text[i + 1] === "\n") i++;
               row.push(cur);
               cur = "";
-              if (row.length > 1 || row[0] !== "") rows.push(row);
+              if (row.some((c) => (c || "").trim() !== "")) rows.push(row);
               row = [];
             } else cur += ch;
           }
         }
         if (cur !== "" || row.length) {
           row.push(cur);
-          if (row.length > 1 || row[0] !== "") rows.push(row);
+          if (row.some((c) => (c || "").trim() !== "")) rows.push(row);
         }
         return rows;
       }
@@ -3512,30 +3533,25 @@ ${[...r.history]
           const f = e.target.files[0];
           if (!f) return;
           const text = await f.text();
-          const rows = parseCsv(text);
-          if (rows.length < 2) {
-            alert(
-              "CSV walang laman — need a header row plus at least one data row.",
-            );
-            return;
-          }
-          const header = rows[0].map((h) => normName(h).replace(/ /g, ""));
-          const idxOf = (c) => header.indexOf(c);
-          if (idxOf("name") < 0) {
-            alert(
-              "Missing required column: name. Use the Export Product List template.",
-            );
-            return;
-          }
-          const dataRows = rows.slice(1).map((r) => {
-            const o = {};
-            INV_CSV_COLS.forEach((c) => {
-              const i = idxOf(c);
-              o[c] = i >= 0 ? (r[i] || "").trim() : "";
-            });
-            return o;
-          });
-          buildCsvPlan(dataRows);
+          const rows = parseCsv(text, detectCsvDelimiter(text));
+if(rows.length < 2){ alert('CSV walang langan — need a header row plus at least one data row.'); return; }
+let headerIdx = -1;
+for(let i=0;i<Math.min(rows.length,10);i++){
+if(rows[i].map(h=>normName(h).replace(/ /g,'')).includes('name')){ headerIdx = i; break; }
+}
+if(headerIdx < 0){
+alert('Missing required column: name.\nFirst row seen: ' + (rows[0]||[]).slice(0,6).join(' | ') + '\nSave from Excel as "CSV (Comma delimited)" with the header on row 1, or use the Export Product List template.');
+return;
+}
+const header = rows[headerIdx].map(h=>normName(h).replace(/ /g,''));
+const idxOf = c => header.indexOf(c);
+const dataRows = rows.slice(headerIdx+1).map(r=>{
+const o = {};
+INV_CSV_COLS.forEach(c=>{ const i = idxOf(c); o[c] = i>=0 ? (r[i]||'').trim() : ''; });
+return o;
+});
+if(dataRows.length===0){ alert('Header OK but no data rows found below it.'); return; }
+buildCsvPlan(dataRows);
         };
         fileInput.click();
       }
