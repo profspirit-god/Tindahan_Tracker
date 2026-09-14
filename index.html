@@ -1089,7 +1089,7 @@
         "Saturday",
       ];
 
-      const APP_VERSION = "v28.7.1"; // bump this by hand with each future commit
+      const APP_VERSION = "v28.7.2"; // bump this by hand with each future commit
 
       const NAV_ITEMS = [
         { view: "daily", ic: "🗓️", label: "Today's Entry" },
@@ -1142,7 +1142,7 @@
         "Price Alert": "💰",
         "Supplier Today": "🚚",
         "No Entry": "📝",
-        "Uncollected": "🤝",
+        Uncollected: "🤝",
         "Low Margin": "🏷️",
       };
       let notifExpandedGroups = {};
@@ -1239,14 +1239,19 @@
             });
           }
         });
-        (state.inventory||[]).forEach(r=>{
-const price = Number(r.price)||0;
-if(price<=0) return;
-const pct = Math.round(((price - (Number(r.cost)||0)) / price) * 100);
-if(pct < 10){
-notifs.push({type:'Low Margin', text:`${r.name} — margin only ${pct}% (cost ${peso(r.cost)} vs sell ${peso(r.price)})`});
-}
-});
+        (state.inventory || []).forEach((r) => {
+          const price = Number(r.price) || 0;
+          if (price <= 0) return;
+          const pct = Math.round(
+            ((price - (Number(r.cost) || 0)) / price) * 100,
+          );
+          if (pct < 10) {
+            notifs.push({
+              type: "Low Margin",
+              text: `${r.name} — margin only ${pct}% (cost ${peso(r.cost)} vs sell ${peso(r.price)})`,
+            });
+          }
+        });
         const todayName = WEEKDAYS[new Date().getDay()];
         state.suppliers
           .filter(
@@ -1397,6 +1402,7 @@ notifs.push({type:'Low Margin', text:`${r.name} — margin only ${pct}% (cost ${
       let itemModalEditIndex = null; // null = adding new, otherwise index of item being edited
       let invPageSize = "20";
       let invLowStockOnly = false;
+      let invSort = "name-asc";
       let stockHistPageSize = "20";
       let dailyShowCount = 30;
       let gcashShowCount = 30;
@@ -3158,10 +3164,11 @@ ${[...r.history]
           (r) =>
             daysUntil(r.expiryDate) !== null && daysUntil(r.expiryDate) <= 7,
         );
+        const sortedRows = applyInvSort(rows);
         const displayRows =
           invPageSize === "All"
-            ? rows
-            : rows.slice(0, parseInt(invPageSize, 10));
+            ? sortedRows
+            : sortedRows.slice(0, parseInt(invPageSize, 10));
 
         return `
   ${header("Inventory", "Listahan ng mga Paninda")}
@@ -3211,7 +3218,16 @@ ${[...r.history]
         <option value="All" ${invPageSize === "All" ? "selected" : ""}>Show All</option>
       </select>
     </div>
-
+    
+    <div class="filter-row">
+    <select onchange="setInvSort(this.value)" style="flex:1;">
+    ${invSortOptions()}
+    </select>
+    </div>
+    <div style="display:flex; gap:8px; margin-bottom:10px;">
+    <button class="btn" style="flex:1; background:transparent; border:1.5px solid var(--teal); color:var(--teal); padding:10px; font-size:13px;" onclick="exportInventoryCsv()">⬇ Export Product List (CSV)</button>
+    <button class="btn" style="flex:1; background:transparent; border:1.5px solid var(--brass); color:var(--brass); padding:10px; font-size:13px;" onclick="startCsvImport()">⬆ Import CSV</button>
+    </div>
     <button class="btn btn-primary" style="margin-bottom:6px;" onclick="openItemModal()">+ Add New Item</button>
   
     <div class="section-title">Item List (${displayRows.length} of ${rows.length})</div>
@@ -3251,6 +3267,12 @@ ${[...r.history]
             <div class="sumline"><span>Cost / Unit</span><b>${peso(r.cost)}</b></div>
             <div class="sumline"><span>Sell Price</span><b>${peso(r.price)}</b></div>
             <div class="sumline"><span>Margin / Unit</span><b>${peso(margin)}</b></div>
+            ${(() => {
+              const pr = Number(r.price) || 0;
+              if (pr <= 0) return "";
+              const pct = Math.round(((pr - Number(r.cost) || 0) / pr) * 100);
+              return `<div class="sumline"><span>Margin %</span><b style="${pct < 10 ? "color:var(--bad)" : ""}">${pct}%${pct < 10 ? " — mababa, presyo review" : ""}</b></div>`;
+            })()}
           `
           }
           <div class="sumline"><span>Reorder At</span><b>${r.reorder} ${r.unit}</b></div>
@@ -3319,6 +3341,525 @@ ${[...r.history]
       function setInvPageSize(v) {
         invPageSize = v;
         render();
+      }
+
+      function applyInvSort(rows) {
+        const arr = [...rows];
+        const marginOf = (r) => (Number(r.price) || 0) - (Number(r.cost) || 0);
+        switch (invSort) {
+          case "name-desc":
+            arr.sort((a, b) => (b.name || "").localeCompare(a.name || ""));
+            break;
+          case "stock-desc":
+            arr.sort((a, b) => (Number(b.stock) || 0) - (Number(a.stock) || 0));
+            break;
+          case "stock-asc":
+            arr.sort((a, b) => (Number(a.stock) || 0) - (Number(b.stock) || 0));
+            break;
+          case "price-desc":
+            arr.sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0));
+            break;
+          case "price-asc":
+            arr.sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
+            break;
+          case "margin-desc":
+            arr.sort((a, b) => marginOf(b) - marginOf(a));
+            break;
+          case "margin-asc":
+            arr.sort((a, b) => marginOf(a) - marginOf(b));
+            break;
+          default:
+            arr.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+        }
+        return arr;
+      }
+      function setInvSort(v) {
+        invSort = v;
+        render();
+      }
+      function invSortOptions() {
+        const opts = [
+          ["name-asc", "Name A–Z"],
+          ["name-desc", "Name Z–A"],
+          ["stock-desc", "Stock: High → Low"],
+          ["stock-asc", "Stock: Low → High"],
+          ["price-desc", "Price: High → Low"],
+          ["price-asc", "Price: Low → High"],
+          ["margin-desc", "Margin: High → Low"],
+          ["margin-asc", "Margin: Low → High"],
+        ];
+        return opts
+          .map(
+            (o) =>
+              `<option value="${o[0]}" ${invSort === o[0] ? "selected" : ""}>${o[1]}</option>`,
+          )
+          .join("");
+      }
+      function numOr0(v) {
+        if (v === "" || v === undefined || v === null) return 0;
+        const n = Number(v);
+        return isNaN(n) ? 0 : n;
+      }
+      function normName(s) {
+        return (s || "")
+          .toLowerCase()
+          .replace(/[^a-z0-9 ]/g, "")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+      function fuzzyThreshold(name) {
+        return (name || "").length >= 6 ? 2 : 1;
+      }
+      function levDistance(a, b) {
+        if (a === b) return 0;
+        const m = a.length,
+          n = b.length;
+        if (!m) return n;
+        if (!n) return m;
+        let prev = Array.from({ length: n + 1 }, (_, j) => j);
+        for (let i = 1; i <= m; i++) {
+          const cur = [i];
+          for (let j = 1; j <= n; j++) {
+            cur[j] = Math.min(
+              prev[j] + 1,
+              cur[j - 1] + 1,
+              prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+            );
+          }
+          prev = cur;
+        }
+        return prev[n];
+      }
+      function parseCsv(text) {
+        text = text.replace(/^\uFEFF/, "");
+        const rows = [];
+        let row = [],
+          cur = "",
+          inQ = false;
+        for (let i = 0; i < text.length; i++) {
+          const ch = text[i];
+          if (inQ) {
+            if (ch === '"') {
+              if (text[i + 1] === '"') {
+                cur += '"';
+                i++;
+              } else inQ = false;
+            } else cur += ch;
+          } else {
+            if (ch === '"') inQ = true;
+            else if (ch === ",") {
+              row.push(cur);
+              cur = "";
+            } else if (ch === "\n" || ch === "\r") {
+              if (ch === "\r" && text[i + 1] === "\n") i++;
+              row.push(cur);
+              cur = "";
+              if (row.length > 1 || row[0] !== "") rows.push(row);
+              row = [];
+            } else cur += ch;
+          }
+        }
+        if (cur !== "" || row.length) {
+          row.push(cur);
+          if (row.length > 1 || row[0] !== "") rows.push(row);
+        }
+        return rows;
+      }
+      const INV_CSV_COLS = [
+        "code",
+        "name",
+        "category",
+        "storageType",
+        "unit",
+        "cost",
+        "price",
+        "stock",
+        "reorder",
+        "supplier",
+        "expiryDate",
+      ];
+      function exportInventoryCsv() {
+        if (!state.inventory || state.inventory.length === 0) {
+          alert("Walang item — nothing to export.");
+          return;
+        }
+        const esc = (v) => {
+          if (v === null || v === undefined) return "";
+          const s = String(v);
+          return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+        };
+        const lines = [INV_CSV_COLS.join(",")];
+        state.inventory.forEach((r) =>
+          lines.push(INV_CSV_COLS.map((c) => esc(r[c])).join(",")),
+        );
+        const ts = new Date().toISOString().replace(/[:.]/g, "-");
+        downloadFile(
+          `inventory_template_${ts}.csv`,
+          "text/csv;charset=utf-8",
+          lines.join("\r\n"),
+        );
+      }
+      let csvPlan = null;
+      function startCsvImport() {
+        if (isReadOnly) {
+          alert("Read-only mode is enabled — disable it before importing.");
+          return;
+        }
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = ".csv,text/csv";
+        fileInput.onchange = async (e) => {
+          const f = e.target.files[0];
+          if (!f) return;
+          const text = await f.text();
+          const rows = parseCsv(text);
+          if (rows.length < 2) {
+            alert(
+              "CSV walang laman — need a header row plus at least one data row.",
+            );
+            return;
+          }
+          const header = rows[0].map((h) => normName(h).replace(/ /g, ""));
+          const idxOf = (c) => header.indexOf(c);
+          if (idxOf("name") < 0) {
+            alert(
+              "Missing required column: name. Use the Export Product List template.",
+            );
+            return;
+          }
+          const dataRows = rows.slice(1).map((r) => {
+            const o = {};
+            INV_CSV_COLS.forEach((c) => {
+              const i = idxOf(c);
+              o[c] = i >= 0 ? (r[i] || "").trim() : "";
+            });
+            return o;
+          });
+          buildCsvPlan(dataRows);
+        };
+        fileInput.click();
+      }
+      function computeCsvChanges(e, matchIdx) {
+        const it = state.inventory[matchIdx];
+        e.kind = "update";
+        e.matchIdx = matchIdx;
+        e.changes = [];
+        ["category", "storageType", "unit", "supplier", "expiryDate"].forEach(
+          (f) => {
+            const v = e.row[f];
+            if (v === "CLEAR") {
+              if (String(it[f] || "") !== "")
+                e.changes.push({
+                  field: f,
+                  old: String(it[f] || ""),
+                  new: "",
+                  raw: "",
+                });
+              return;
+            }
+            if (!v) return;
+            if (String(it[f] || "") !== v)
+              e.changes.push({
+                field: f,
+                old: String(it[f] || ""),
+                new: v,
+                raw: v,
+              });
+          },
+        );
+        ["cost", "price", "stock", "reorder"].forEach((f) => {
+          const v = e.row[f];
+          if (v === "") return;
+          if (v === "CLEAR") {
+            if (Number(it[f] || 0) !== 0)
+              e.changes.push({
+                field: f,
+                old: String(it[f] || 0),
+                new: "0",
+                raw: 0,
+              });
+            return;
+          }
+          const nv = Number(v);
+          if (isNaN(nv)) {
+            e.kind = "error";
+            e.reason = "Bad number in " + f;
+            return;
+          }
+          if (Number(it[f] || 0) !== nv)
+            e.changes.push({
+              field: f,
+              old: String(it[f] || 0),
+              new: String(nv),
+              raw: nv,
+            });
+        });
+        if (e.kind === "update" && e.changes.length === 0) {
+          e.kind = "skip";
+        }
+      }
+      function applyCsvField(it, f, raw) {
+        it[f] = raw;
+        if (
+          (f === "cost" || f === "price") &&
+          it.isComposite &&
+          it.compositeLevels &&
+          it.compositeLevels.length
+        ) {
+          it.compositeLevels[it.compositeLevels.length - 1][f] = raw;
+        }
+      }
+      function buildCsvPlan(dataRows) {
+        const entries = [];
+        dataRows.forEach((row, ri) => {
+          const e = {
+            idx: ri + 2,
+            row,
+            kind: null,
+            chosen: null,
+            members: null,
+          };
+          if (!row.name) {
+            e.kind = "error";
+            e.reason = "Missing name";
+            entries.push(e);
+            return;
+          }
+          const badNum = ["cost", "price", "stock", "reorder"].find(
+            (f) => row[f] !== "" && row[f] !== "CLEAR" && isNaN(Number(row[f])),
+          );
+          if (badNum) {
+            e.kind = "error";
+            e.reason = "Bad number in " + badNum;
+            entries.push(e);
+            return;
+          }
+          const codeMatch = row.code
+            ? state.inventory.findIndex((it) => it.code === row.code)
+            : -1;
+          const nn = normName(row.name);
+          const exactMatch =
+            codeMatch >= 0
+              ? codeMatch
+              : state.inventory.findIndex((it) => normName(it.name) === nn);
+          if (exactMatch >= 0) {
+            computeCsvChanges(e, exactMatch);
+            if (e.kind !== "skip") entries.push(e);
+            return;
+          }
+          let best = -1,
+            bestD = 99;
+          state.inventory.forEach((it, ii) => {
+            const d = levDistance(nn, normName(it.name));
+            if (d < bestD) {
+              bestD = d;
+              best = ii;
+            }
+          });
+          if (best >= 0 && bestD <= fuzzyThreshold(nn)) {
+            e.kind = "create";
+            entries.push({
+              kind: "conflict",
+              ctype: "fuzzy",
+              matchIdx: best,
+              members: [e],
+              chosen: null,
+              row,
+              reason: `Similar existing item: "${state.inventory[best].name}" (${bestD} edit${bestD === 1 ? "" : "s"} away).`,
+              detail:
+                "Merge updates the existing item; Create adds a new product.",
+              options: [
+                "Merge into " + state.inventory[best].name,
+                "Create as separate",
+              ],
+            });
+            entries.push(e);
+            return;
+          }
+          e.kind = "create";
+          entries.push(e);
+        });
+        const creates = entries.filter((x) => x.kind === "create");
+        const clusters = [];
+        creates.forEach((c) => {
+          const nn = normName(c.row.name);
+          let host = clusters.find(
+            (cl) =>
+              cl.nn === nn || levDistance(nn, cl.nn) <= fuzzyThreshold(nn),
+          );
+          if (!host) {
+            host = { nn, members: [] };
+            clusters.push(host);
+          }
+          host.members.push(c);
+        });
+        clusters.forEach((cl) => {
+          if (cl.members.length > 1) {
+            entries.push({
+              kind: "conflict",
+              ctype: "dupcreate",
+              members: cl.members,
+              chosen: null,
+              row: cl.members[0].row,
+              reason: `${cl.members.length} CSV rows look like the same product.`,
+              detail: cl.members
+                .map((m) => "row " + m.idx + ": " + m.row.name)
+                .join(" | "),
+              options: ["Keep last", "Keep first", "Create both"],
+            });
+          }
+        });
+        const byMatch = {};
+        entries
+          .filter((x) => x.kind === "update")
+          .forEach((u) => {
+            (byMatch[u.matchIdx] = byMatch[u.matchIdx] || []).push(u);
+          });
+        Object.values(byMatch).forEach((group) => {
+          if (group.length > 1) {
+            entries.push({
+              kind: "conflict",
+              ctype: "dupupdate",
+              members: group,
+              chosen: null,
+              row: group[0].row,
+              reason: "Two CSV rows update the same existing item.",
+              detail: group.map((m) => "row " + m.idx).join(" | "),
+              options: ["Keep last", "Keep first"],
+            });
+          }
+        });
+        csvPlan = { entries };
+        renderCsvReview();
+      }
+      function renderCsvReview() {
+        const sheet = document.getElementById("item-modal-sheet");
+        const p = csvPlan;
+        const creates = p.entries.filter((x) => x.kind === "create");
+        const updates = p.entries.filter((x) => x.kind === "update");
+        const conflicts = p.entries.filter((x) => x.kind === "conflict");
+        const errors = p.entries.filter((x) => x.kind === "error");
+        sheet.innerHTML = `
+<div class="modal-title-row"><h3>📥 CSV Import Review</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+<p class="subtitle">Create ${creates.length} · Update ${updates.length} · Needs decision ${conflicts.length} · Errors ${errors.length}</p>
+${
+  conflicts.length
+    ? `<div class="section-title">Needs your decision</div>` +
+      conflicts
+        .map(
+          (c, ci) => `
+<div class="card" style="padding:12px; margin-bottom:8px;">
+<b>${escapeHtml(c.row.name)}</b>
+<div class="meta" style="margin:4px 0 2px;">${escapeHtml(c.reason)}</div>
+<div class="meta" style="margin:0 0 8px;">${escapeHtml(c.detail || "")}</div>
+<div style="display:flex; gap:6px; flex-wrap:wrap;">
+${c.options.map((o, oi) => `<button class="btn" style="padding:7px 10px; font-size:12px; background:${c.chosen === oi ? "var(--teal)" : "var(--page-line)"}; color:${c.chosen === oi ? "#fff" : "var(--ink)"};" onclick="resolveCsvConflict(${ci}, ${oi})">${escapeHtml(o)}</button>`).join("")}
+</div>
+</div>`,
+        )
+        .join("")
+    : ""
+}
+${
+  updates.length
+    ? `<div class="section-title">Updates (old → new)</div><div class="card">` +
+      updates
+        .map(
+          (u) => `
+<div class="entry"><div><b>${escapeHtml(u.row.name)}</b><div class="meta">${u.changes.map((ch) => escapeHtml(ch.field + ": " + ch.old + " → " + ch.new)).join(" · ")}</div></div></div>`,
+        )
+        .join("") +
+      `</div>`
+    : ""
+}
+${creates.length ? `<div class="section-title">New items</div><div class="card">` + creates.map((c) => `<div class="sumline"><span>${escapeHtml(c.row.name)}</span><b>${escapeHtml(c.row.category || "Other")}</b></div>`).join("") + `</div>` : ""}
+${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="card">` + errors.map((er) => `<div class="sumline"><span>${escapeHtml(er.row.name || "row " + er.idx)}</span><b style="color:var(--bad);">${escapeHtml(er.reason)}</b></div>`).join("") + `</div>` : ""}
+<button class="btn btn-primary" onclick="applyCsvPlan()">✅ Confirm Import</button>
+`;
+        document.getElementById("item-modal-overlay").classList.add("open");
+      }
+      function resolveCsvConflict(ci, oi) {
+        const c = csvPlan.entries.filter((x) => x.kind === "conflict")[ci];
+        c.chosen = oi;
+        if (c.ctype === "fuzzy") {
+          if (oi === 0) computeCsvChanges(c.members[0], c.matchIdx);
+          else c.members[0].kind = "create";
+        }
+        renderCsvReview();
+      }
+      function applyCsvPlan() {
+        const p = csvPlan;
+        const conflicts = p.entries.filter((x) => x.kind === "conflict");
+        if (
+          conflicts.some((c) => c.chosen === null || c.chosen === undefined)
+        ) {
+          alert('Resolve all "Needs decision" cards first.');
+          return;
+        }
+        const drop = new Set();
+        conflicts.forEach((c) => {
+          if (c.ctype === "fuzzy") return;
+          const n = c.members.length;
+          let keep = null;
+          if (c.options[c.chosen] === "Keep last") keep = n - 1;
+          else if (c.options[c.chosen] === "Keep first") keep = 0;
+          if (keep === null) return;
+          c.members.forEach((m, mi) => {
+            if (mi !== keep) drop.add(m);
+          });
+        });
+        const snapshot = JSON.parse(JSON.stringify(state));
+        let created = 0,
+          updated = 0;
+        p.entries.forEach((e) => {
+          if (drop.has(e)) return;
+          if (e.kind === "create") {
+            const cat =
+              e.row.category && CATEGORIES.includes(e.row.category)
+                ? e.row.category
+                : "Other";
+            const it = {
+              name: e.row.name,
+              category: cat,
+              storageType:
+                e.row.storageType && STORAGE_TYPES.includes(e.row.storageType)
+                  ? e.row.storageType
+                  : "Dry",
+              unit: e.row.unit || "pcs",
+              supplier: e.row.supplier || "",
+              expiryDate: e.row.expiryDate || "",
+              isComposite: false,
+              compositeLevels: null,
+              code: generateProductCode(cat),
+              cost: numOr0(e.row.cost),
+              price: numOr0(e.row.price),
+              stock: numOr0(e.row.stock),
+              reorder: numOr0(e.row.reorder),
+              supplierPrices: [],
+              consignmentStock: 0,
+            };
+            state.inventory.push(it);
+            created++;
+          } else if (e.kind === "update") {
+            const it = state.inventory[e.matchIdx];
+            e.changes.forEach((ch) => {
+              applyCsvField(it, ch.field, ch.raw);
+            });
+            if (Number(it.stock) < Number(it.consignmentStock || 0)) {
+              it.consignmentStock = Number(it.stock);
+            }
+            updated++;
+          }
+        });
+        pushUndo({
+          type: "reset-snapshot",
+          label: "Undo CSV import",
+          snapshot,
+        });
+        saveState();
+        closeItemModal();
+        render();
+        alert(`CSV import done: ${created} created, ${updated} updated.`);
       }
 
       // As of v28.2.1, ALL quantity entry (simple or composite) goes through the
@@ -4735,7 +5276,9 @@ ${[...r.history]
     <div class="help-h">Data Tools (nasa Store Health)</div>
     <p class="help-p"><b>Download Summary (Word)</b> — buod ng buwan na pwedeng i-print o ipadala.</p>
     <p class="help-p"><b>Reset for a Clean Slate</b> — buburahin ang Daily Entries, GCash, at Loans; hindi kasama ang Top Items.</p>
-
+    
+    <div class="help-h">📦 Bulk Inventory (CSV)</div>
+    <p class="help-p"><b>Export Product List (CSV)</b> — buksan sa Excel, i-edit ang presyo o stock, save, then <b>Import CSV</b>. Blank cell = walang babaguhin; CLEAR = burahin ang field. Bago ma-apply, makikita mo muna ang review: Create / Update / Needs decision / Errors. Ang magkakaparehong pangalan (kahit mali ang spelling) ay itatanong muna bago gagawin.</p>
     <div class="help-h">Tips</div>
     ${tips.map((t) => `<div class="tip">${t}</div>`).join("")}
   </main>`;
