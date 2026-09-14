@@ -4,7 +4,7 @@ A shared, single-file web app for tracking a family sari-sari store's cash flow,
 
 Built collaboratively with Claude (Anthropic), iteratively, feature-by-feature, based on real problems the store's owners hit while using it. There is no build step, no framework, and no local dependencies — it is intentionally simple to keep it maintainable by non-professional developers.
 
-**Current version: `v27.1.0`** (shown at the bottom of the sidebar, from the `APP_VERSION` constant near the top of the script).
+**Current version: `v28.7.1`** (shown at the bottom of the sidebar, from the `APP_VERSION` constant near the top of the script).
 
 ## Who this is for
 
@@ -23,6 +23,7 @@ Built collaboratively with Claude (Anthropic), iteratively, feature-by-feature, 
 1. Clone the repo.
 2. Open `index.html` directly in a browser, or use a local dev server (e.g. VS Code's "Live Server" extension) — **do not open via `file://`**, it causes CORS/security quirks with Supabase. Live Server or the deployed GitHub Pages URL both work fine.
 3. Supabase setup (if setting up a fresh instance):
+
    ```sql
    create table app_state (
      id int primary key,
@@ -34,19 +35,21 @@ Built collaboratively with Claude (Anthropic), iteratively, feature-by-feature, 
    create policy "public read/write" on app_state
      for all using (true) with check (true);
    ```
+
    Then set `SUPABASE_URL` and `SUPABASE_KEY` (the anon/publishable key — never the service_role key) near the top of `index.html`.
+
 4. Deploy: standard `git add . && git commit -m "..." && git push`. GitHub Pages picks it up automatically.
 
 ## Core concept: the "money pots"
 
 The entire app is built around keeping four types of money **strictly separate**, since mixing them was the root cause of the family not knowing their real financial position:
 
-| Pot | Purpose | Tracked in |
-|---|---|---|
-| **Store Cash** | Buying/selling stock | Today's Entry |
-| **GCash Float** | Customer cash-in/cash-out service only — never supplier payments | GCash |
-| **Household** | Family living expenses, drawn from the store | Household Budget |
-| **Expansion** | A *separate business* (an ihaw-ihaw stall) being built by the family — must never be counted as a store expense | Expansion (Stall) |
+| Pot             | Purpose                                                                                                         | Tracked in        |
+| --------------- | --------------------------------------------------------------------------------------------------------------- | ----------------- |
+| **Store Cash**  | Buying/selling stock                                                                                            | Today's Entry     |
+| **GCash Float** | Customer cash-in/cash-out service only — never supplier payments                                                | GCash             |
+| **Household**   | Family living expenses, drawn from the store                                                                    | Household Budget  |
+| **Expansion**   | A _separate business_ (an ihaw-ihaw stall) being built by the family — must never be counted as a store expense | Expansion (Stall) |
 
 **Any new feature must respect this separation.** If you're not sure which pot a transaction belongs to, ask before writing it to `dailyLogs`.
 
@@ -69,7 +72,7 @@ Note (v28.4.0): expenses are paid from mixed pots in a fixed order (yesterday's 
 - **Suppliers** — directory with visit schedules (Fixed Day / Irregular / Canvass Only) and per-item price history with change alerts.
 - **Insights** — Revenue/Expenses/Profit line chart, household spending pie chart, expansion cumulative spend chart, daily/category rankings, and an Inventory Health Matrix (ABC value tier × Fast/Slow/Dead movement, with GMROI).
 - **Help & Tips** — an in-app, bilingual explainer of the PIN/name flow, the three money pots, and how to use each tool — the reference for tone when writing new user-facing copy.
-- **Notification bell** — unified alerts: low stock, expiring soon, price changes, suppliers scheduled today, and a *missed or pending daily entry* reminder (silent if today's already logged; nudges after 6 PM if only today is missing; always flags if a full day or more was skipped). Loan alerts are schedule-aware per type — Installment and Consignment only surface when actually due soon or overdue, rather than showing "unpaid" for the entire life of the loan. Replaces scattered per-tile badges.
+- **Notification bell** — unified alerts: low stock, expiring soon, price changes, suppliers scheduled today, and a _missed or pending daily entry_ reminder (silent if today's already logged; nudges after 6 PM if only today is missing; always flags if a full day or more was skipped). Loan alerts are schedule-aware per type — Installment and Consignment only surface when actually due soon or overdue, rather than showing "unpaid" for the entire life of the loan. Replaces scattered per-tile badges.
 - **Access:** a shared family PIN (remembered per device) plus a per-device username system (for attribution on entries, not real security).
 
 ### Data safety tools
@@ -98,12 +101,14 @@ state = {
 When adding a new field to an existing record type, always update the migration function (`ensureInventoryFields()`) to backfill defaults for existing data — never assume a field exists on old records. For a migration that transforms or removes data on existing records (not just backfilling a default), use `runReversibleMigration()` instead so the change is snapshotted and undoable.
 
 Two additions worth knowing about:
+
 - **`payables` records carry a `type`** (`One-time` / `Installment` / `Consignment`), with different fields per type and a shared `history[]` ledger for anything beyond a single-payment loan. See `AI_INSTRUCTIONS.md`'s "Loan Management" section for the exact shape of each.
 - **`inventory` records carry a `consignmentStock`** — the portion of that item's current stock that's on consignment (owed, not yet paid for) rather than store-owned. A small `_meta` object (`lastSavedAt`, `lastSavedBy`) also rides inside the top-level `state` blob itself, used only for the save-conflict check above — it's not tied to any one table.
 
 ## Versioning policy
 
 Documented format: **`vMAJOR.CLEAN.MINOR`**
+
 - **MAJOR** — new tabs, structural changes, new data models (resets CLEAN and MINOR to 0)
 - **CLEAN** — bug fixes, cleanup (resets MINOR to 0)
 - **MINOR** — small tweaks, label changes, small field additions
@@ -115,11 +120,12 @@ The current version lives in the `APP_VERSION` constant near the top of the scri
 ## Why so simple? (no build step, no framework, no CI)
 
 This is a deliberate choice, not a limitation to "graduate" from later:
+
 - The end users are non-technical family members — every dependency added is a dependency that can break for them.
 - There is no dedicated ops capacity — no staging environment, automated tests, or deployment pipeline is warranted for a single-store internal tool.
 - A single HTML file is something both developers can fully hold in their head, `git diff` cleanly, and hand to an AI assistant with full context in one paste.
 
-Don't add a build step, a framework, or a testing framework unless a real, hit problem specifically requires it — not because "best practice" says so in general. (The read-only mode, undo stack, and reversible-migration helper described above are the kind of *in-file* safety net this philosophy does welcome — they add no dependencies, no build step, and no external tooling.)
+Don't add a build step, a framework, or a testing framework unless a real, hit problem specifically requires it — not because "best practice" says so in general. (The read-only mode, undo stack, and reversible-migration helper described above are the kind of _in-file_ safety net this philosophy does welcome — they add no dependencies, no build step, and no external tooling.)
 
 ## Before pushing any change
 

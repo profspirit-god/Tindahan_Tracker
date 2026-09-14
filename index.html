@@ -219,7 +219,7 @@
         margin: 0 0 14px;
       }
       .card {
-        background: #fff;
+        background: var(--card);
         border: 1px solid var(--page-line);
         border-radius: var(--radius);
         padding: 16px;
@@ -247,7 +247,7 @@
         border: 1.5px solid var(--page-line);
         border-radius: 10px;
         font-family: inherit;
-        background: #fefdfa;
+        background: var(--input-bg);
         color: var(--ink);
       }
       input:focus,
@@ -324,7 +324,7 @@
         color: var(--good);
       }
       .pill.unpaid {
-        background: #fff;
+        background: var(--card);
         color: var(--bad);
         border: 1px solid var(--bad);
       }
@@ -360,7 +360,7 @@
       .stamp.bad {
         border-color: var(--bad);
         color: var(--bad);
-        background: #fff;
+        background: var(--card);
         border-style: dashed;
       }
       .row2 {
@@ -468,7 +468,7 @@
       }
       #chart-modal .modal-body {
         flex: 1;
-        background: #fff;
+        background: var(--card);
         border-radius: 14px;
         padding: 16px;
         display: flex;
@@ -504,7 +504,7 @@
         margin-left: 6px;
       }
       .item-row {
-        background: #fff;
+        background: var(--card);
         border: 1px solid var(--page-line);
         border-radius: 12px;
         margin-bottom: 10px;
@@ -783,6 +783,30 @@
           min-width: 0;
         }
       }
+      :root{ --card:#FFFFFF; --input-bg:#FEFDFA; }
+body.dark-mode{
+--page:#141518;
+--cover:#000000;
+--cover-dark:#000000;
+--ink:#F3F4F6;
+--ink-soft:#9CA3AF;
+--page-line:#2B2E33;
+--brass:#F3F4F6;
+--brass-light:#7A8087;
+--card:#1B1D22;
+--input-bg:#23262C;
+--accent-soft:#221A31;
+--accent-soft-border:#3D2F58;
+--accent-soft-text:#C4B5FD;
+--good-bg:#122A20;
+--bad-bg:#2E1613;
+}
+body.dark-mode #sidebar, body.dark-mode .sb-link{ color:#F3F4F6; }
+body.dark-mode #lock-screen, body.dark-mode #username-screen{ color:#F3F4F6; }
+.info-i{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink-soft);color:var(--ink-soft);font-size:11px;font-style:normal;font-weight:700;margin-left:6px;cursor:pointer;vertical-align:middle;}
+#info-pop{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:995;background:var(--ink);color:var(--page);padding:12px 16px;border-radius:12px;font-size:13.5px;line-height:1.5;max-width:440px;display:none;box-shadow:0 4px 16px rgba(0,0,0,.35);}
+.hint-opt{display:none;}
+body.show-hints .hint-opt{display:block;}
     </style>
   </head>
   <body>
@@ -921,15 +945,53 @@
       const STORE_PIN = "2808";
       const HISTORY_PASSKEY = "2806";
 
-      function checkPin() {
+      function pinLockRemaining(){
+const until = Number(localStorage.getItem('pinLockUntil')||0);
+return Math.max(0, until - Date.now());
+}
+let pinCountdownTimer = null;
+function startPinCountdown(){
+if(pinCountdownTimer) clearInterval(pinCountdownTimer);
+pinCountdownTimer = setInterval(()=>{
+const ms = pinLockRemaining();
+const le = document.getElementById('lock-error');
+if(ms <= 0){
+clearInterval(pinCountdownTimer); pinCountdownTimer = null;
+if(le) le.textContent = '';
+return;
+}
+if(le) le.textContent = 'Too many wrong tries — try again in ' + Math.ceil(ms/1000) + 's';
+}, 1000);
+}
+function notePinFail(){
+const fails = Number(localStorage.getItem('pinFails')||0) + 1;
+if(fails >= 3){
+const stage = Number(localStorage.getItem('pinLockStage')||0);
+const esc = Math.min(30*60*1000, 60*1000 * Math.pow(2, stage));
+localStorage.setItem('pinLockStage', String(stage+1));
+localStorage.setItem('pinLockUntil', String(Date.now() + esc));
+localStorage.setItem('pinFails', '0');
+startPinCountdown();
+} else {
+localStorage.setItem('pinFails', String(fails));
+}
+}
+function checkPin(){
+if(pinLockRemaining() > 0){ startPinCountdown(); return; }
         const val = document.getElementById("lock-input").value;
         if (val === STORE_PIN) {
-          localStorage.setItem("storeUnlocked", "true");
+          localStorage.setItem('pinFails','0');
+localStorage.setItem('pinLockUntil','0');
+if(pinCountdownTimer){ clearInterval(pinCountdownTimer); pinCountdownTimer=null; }
+localStorage.setItem('storeUnlocked', 'true');
           document.getElementById("lock-screen").style.display = "none";
           startApp();
         } else {
-          document.getElementById("lock-error").textContent =
-            "Wrong PIN - try again";
+          notePinFail();
+if(pinLockRemaining() <= 0){
+const left = 3 - Number(localStorage.getItem('pinFails')||0);
+document.getElementById('lock-error').textContent = 'Wrong PIN - try again (' + left + ' tries left)';
+}
           document.getElementById("lock-input").value = "";
         }
       }
@@ -1089,34 +1151,156 @@
         "Saturday",
       ];
 
-      const APP_VERSION = "v28.8.0"; // bump this by hand with each future commit
+      const APP_VERSION = "v29.0.0"; // bump this by hand with each future commit
 
-      const NAV_ITEMS = [
-        { view: "daily", ic: "🗓️", label: "Today's Entry" },
-        { view: "gcash", ic: "📲", label: "GCash" },
-        { view: "household", ic: "💵", label: "Household Budget" },
-        { view: "payables", ic: "📒", label: "Utang / Loans" },
-        { view: "receivables", ic: "🤝", label: "Suki Utang (Receivables)" },
-        { view: "expansion", ic: "🔨", label: "Expansion (Stall)" },
-        { view: "inventory", ic: "📦", label: "Inventory" },
-        { view: "insights", ic: "📈", label: "Insights" },
-        { view: "suppliers", ic: "🚚", label: "Suppliers" },
-        { view: "help", ic: "💡", label: "Help & Tips" },
+      const NAV_GROUPS = [
+        {
+          key: "supply",
+          ic: "📦",
+          label: "Inventory & Supply",
+          views: ["inventory", "suppliers"],
+        },
+        {
+          key: "credit",
+          ic: "📘",
+          label: "Credit Book — Utang & Suki",
+          views: ["payables", "receivables"],
+        },
+        {
+          key: "family",
+          ic: "💰",
+          label: "Family & Growth",
+          views: ["household", "expansion"],
+        },
+        {
+          key: "reports",
+          ic: "📊",
+          label: "Reports",
+          views: ["insights", "summary"],
+        },
       ];
 
+      function navOpenState() {
+        try {
+          return JSON.parse(localStorage.getItem("navOpenGroups") || "{}");
+        } catch (e) {
+          return {};
+        }
+      }
+      function toggleNavGroup(key) {
+        const s = navOpenState();
+        s[key] = !s[key];
+        localStorage.setItem("navOpenGroups", JSON.stringify(s));
+        renderSidebar();
+      }
+      function groupBadge(key) {
+        if (key === "supply") {
+          const low = state.inventory.filter(
+            (r) => Number(r.stock) <= Number(r.reorder),
+          ).length;
+          const exp = state.inventory.filter((r) => {
+            const d = daysUntil(r.expiryDate);
+            return d !== null && d <= 7;
+          }).length;
+          const n = low + exp;
+          return n > 0 ? String(n) : "";
+        }
+        if (key === "credit") {
+          let n = 0;
+          (state.payables || []).forEach((p) => {
+            const b = getPayableBalance(p);
+            if (b <= 0) return;
+            const nd =
+              p.type === "Installment"
+                ? getInstallmentNextDue(p)
+                : p.type === "Consignment"
+                  ? getConsignmentNextDue(p)
+                  : p.due;
+            if (nd && daysUntil(nd) < 0) n++;
+          });
+          (state.receivables || []).forEach((r) => {
+            const b = getReceivableBalance(r);
+            if (b <= 0) return;
+            if (r.due && daysUntil(r.due) < 0) n++;
+          });
+          return n > 0 ? String(n) : "";
+        }
+        return "";
+      }
+      function todayLogged() {
+        const t = todayStr();
+        return (state.dailyLogs || []).some((r) => r.date === t);
+      }
+      function renderUserPanel() {
+        const month = todayStr().slice(0, 7);
+        const mine = (state.dailyLogs || []).filter(
+          (r) =>
+            r.loggedBy === currentUser && (r.date || "").slice(0, 7) === month,
+        ).length;
+        const sheet = document.getElementById("item-modal-sheet");
+        sheet.innerHTML = `
+<div class="modal-title-row"><h3>👤 ${escapeHtml(currentUser || "—")}</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+<div class="sumline"><span>My entries this month</span><b>${mine}</b></div>
+<div class="sumline"><span>Signed in on this device</span><b>${escapeHtml(localStorage.getItem("storeUsername") || "—")}</b></div>
+<p class="subtitle" style="margin-top:10px;">Role badges and personal codes arrive with Accounts & Roles (v30.0.0).</p>
+<button class="btn btn-primary" onclick="closeItemModal(); switchUser();">Switch User</button>
+`;
+        document.getElementById("item-modal-overlay").classList.add("open");
+      }
       function renderSidebar() {
         const sb = document.getElementById("sidebar");
         if (!sb) return;
-        sb.innerHTML = `
-    <div class="sb-user" style="cursor:pointer;" onclick="switchUser()">👤 ${escapeHtml(currentUser || "—")} <span style="font-size:11px; opacity:.7; margin-left:auto;">(tap to switch)</span></div>
-    <div class="sb-link ${view === "home" ? "active" : ""}" onclick="navFromSidebar('home')"><span class="ic">🏠</span> Store Health</div>
-    <div class="sb-divider"></div>
-    ${NAV_ITEMS.map((n) => `<div class="sb-link ${view === n.view ? "active" : ""}" onclick="navFromSidebar('${n.view}')"><span class="ic">${n.ic}</span> ${n.label}</div>`).join("")}
-    <div class="sb-link" onclick="toggleBigText()"><span class="ic">🔠</span> ${document.body.classList.contains("big-text") ? "Text Size: Large" : "Text Size: Normal"}</div>
-    <div class="sb-link" onclick="toggleMotion()"><span class="ic">🎬</span> ${document.body.classList.contains("no-motion") ? "Motion: Reduced" : "Motion: Normal"}</div>
-    <div class="sb-divider"></div>
-    <div class="sb-version">Tindahan Tracker · ${APP_VERSION}</div>
-  `;
+        const open = navOpenState();
+        const icOf = (v) =>
+          ({
+            inventory: "📦",
+            suppliers: "🚚",
+            payables: "📒",
+            receivables: "🤝",
+            household: "💵",
+            expansion: "🔨",
+            insights: "📈",
+            summary: "🧾",
+          })[v] || "•";
+        const labelOf = (v) =>
+          ({
+            inventory: "Inventory",
+            suppliers: "Suppliers",
+            payables: "Utang / Loans",
+            receivables: "Suki Utang",
+            household: "Household Budget",
+            expansion: "Expansion (Stall)",
+            insights: "Insights",
+            summary: "Monthly Summary",
+          })[v] || v;
+        const link = (v, ic, label, extra) =>
+          `<div class="sb-link ${view === v ? "active" : ""}" onclick="navFromSidebar('${v}')"><span class="ic">${ic}</span> ${label}${extra || ""}</div>`;
+        const dot = todayLogged()
+          ? ""
+          : '<span style="margin-left:auto; width:8px; height:8px; border-radius:50%; background:var(--bad); display:inline-block;"></span>';
+        let html = `
+<div class="sb-user" style="cursor:pointer;" onclick="renderUserPanel()">👤 ${escapeHtml(currentUser || "—")} <span style="font-size:11px; opacity:.7; margin-left:auto;">(tap for panel)</span></div>
+${link("home", "🏠", "Store Health")}
+${link("daily", "️", "Today's Entry", dot)}
+${link("gcash", "📲", "GCash Float")}
+`;
+        NAV_GROUPS.forEach((g) => {
+          const containsActive = g.views.includes(view);
+          const isOpen =
+            open[g.key] === undefined ? containsActive : !!open[g.key];
+          const badge = groupBadge(g.key);
+          html += `<div class="sb-link" onclick="toggleNavGroup('${g.key}')" style="justify-content:space-between;"><span style="display:flex; align-items:center; gap:12px;"><span class="ic">${g.ic}</span> ${g.label}</span><span style="display:flex; align-items:center; gap:8px;">${badge ? `<span class="code-badge" style="margin:0; background:var(--bad); color:#fff;">${badge}</span>` : ""}<span class="chevron ${isOpen ? "open" : ""}">▶</span></span></div>`;
+          if (isOpen) {
+            g.views.forEach((v) => {
+              html += link(v, icOf(v), labelOf(v));
+            });
+          }
+        });
+        html += link("datatools", "🧰", "Data Tools");
+        html += link('settings','⚙️','Settings');
+        html += link("help", "💡", "Help & Tips");
+        html += `<div class="sb-version">Tindahan Tracker · ${APP_VERSION}</div>`;
+        sb.innerHTML = html;
       }
       function toggleSidebar() {
         document.getElementById("sidebar").classList.toggle("open");
@@ -1893,6 +2077,8 @@
         else if (view === "stockHistory") html = renderStockHistory();
         else if (view === "expansion") html = renderExpansion();
         else if (view === "suppliers") html = renderSuppliers();
+        else if (view === "datatools") html = renderDataTools();
+        else if(view==="settings") html = renderSettings();
         app.innerHTML = html;
         attachHandlers();
         renderSidebar();
@@ -1925,6 +2111,7 @@
     <select id="home-month" onchange="changeMonth(this.value)">${monthOptions}</select>
 
     <div class="split"><div>
+    ${todayLogged() ? `<div class="banner" style="margin-top:14px;">✅ Entry logged for today</div>` : `<div class="banner" style="margin-top:14px; background:var(--bad-bg); border-color:var(--bad); color:var(--bad);">⚠️ Wala pang entry today — <span style="text-decoration:underline;" onclick="go('daily')">log it now</span></div>`}
     <div class="stamp ${sum.net >= 0 ? "good" : "bad"}" style="margin-top:16px;">${sum.net >= 0 ? "PROFITABLE THIS MONTH" : "NEEDS ATTENTION"}</div>
 
     ${
@@ -1952,35 +2139,121 @@
     <div id="last-sync" style="text-align:center; font-size:12px; color:var(--ink-soft); margin-top:8px;">${syncStatus === "ok" ? "Last synced OK ✓" : syncStatus === "offline" ? "Saved locally (Offline) ⏳" : syncStatus === "error" ? "Not synced yet ⚠️" : ""}</div>
 
     </div><div>
-    <div class="section-title" style="margin-top:22px;">Data Tools</div>
-    <button class="btn" style="width:100%; background:var(--brass); color:#fff;" onclick="downloadWordSummary()">⬇ Download Summary (Word)</button>
-    <button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="exportAllData()">📦 Export full app state (JSON)</button>
-    <div style="display:flex; gap:8px; margin-top:8px;">
-      <select id="data-table-select" style="flex:1; padding:10px;">
-        <option value="dailyLogs">Daily Entries</option>
-        <option value="gcashLogs">GCash Logs</option>
-        <option value="payables">Payables</option>
-        <option value="receivables">Suki Utang</option>
-        <option value="household">Household</option>
-        <option value="inventory">Inventory</option>
-        <option value="householdHistory">Household History</option>
-        <option value="stockHistory">Stock History</option>
-        <option value="expansionLog">Expansion Log</option>
-        <option value="suppliers">Suppliers</option>
-      </select>
-      <button class="btn" style="flex:1; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="exportRows(document.getElementById('data-table-select').value)">JSON</button>
-      <button class="btn" style="flex:1; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="exportRowsCsv(document.getElementById('data-table-select').value)">CSV</button>
-    </div>
-    <div style="display:flex; gap:8px; margin-top:8px;">
-      <button class="btn" style="flex:1; background:transparent; border:1.5px solid var(--bad); color:var(--bad);" onclick="resetData()">🗑 Reset for a Clean Slate</button>
-      <button class="btn" style="flex:1; background:transparent; border:1.5px solid #666; color:#666;" onclick="toggleReadOnly()">🔒 Toggle Read-only</button>
-    </div>
-    <button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid #444; color:#444;" onclick="importAllDataFromFile()">⬆️ Import state from file (JSON)</button>
-    <p class="subtitle" style="margin-top:6px;">Reset clears Today's Entries, GCash, Loans, and household spending totals only. Top Items is always kept. Use export before risky actions.</p>
+    <div class="section-title" style="margin-top:22px;">Quick Actions</div>
+<button class="btn" style="width:100%; background:var(--teal); color:#fff;" onclick="go('daily')">🗓️ Today's Entry</button>
+<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="go('datatools')">🧰 Data Tools</button>
+<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="go('insights')">📈 Insights</button>
     </div></div>
   </main>`;
       }
 
+      const PREFS_KEY = 'tindahanPrefs';
+function getPrefs(){
+try{
+const p = JSON.parse(localStorage.getItem(PREFS_KEY)||'{}');
+if(p.bigText===undefined) p.bigText = localStorage.getItem('storeBigText')==='1';
+if(p.noMotion===undefined) p.noMotion = localStorage.getItem('storeNoMotion')==='1';
+if(p.dark===undefined) p.dark = false;
+if(p.showHints===undefined) p.showHints = false;
+if(p.lockMins===undefined) p.lockMins = 15;
+return p;
+}catch(e){ return {bigText:false,noMotion:false,dark:false,showHints:false,lockMins:15}; }
+}
+function savePrefs(p){ localStorage.setItem(PREFS_KEY, JSON.stringify(p)); }
+function applyPrefs(){
+const p = getPrefs();
+document.body.classList.toggle('big-text', !!p.bigText);
+document.body.classList.toggle('no-motion', !!p.noMotion);
+document.body.classList.toggle('dark-mode', !!p.dark);
+document.body.classList.toggle('show-hints', !!p.showHints);
+if(window.Chart){
+Chart.defaults.color = p.dark ? '#9CA3AF' : '#6B6B6B';
+Chart.defaults.borderColor = p.dark ? '#2B2E33' : 'rgba(0,0,0,0.1)';
+}
+INACTIVITY_LOCK_MS = p.lockMins * 60 * 1000;
+resetInactivityTimer();
+}
+function setPref(key, val){
+const p = getPrefs(); p[key] = val; savePrefs(p); applyPrefs(); render();
+}
+function renderSettings(){
+const p = getPrefs();
+const row = (label, ic, control) => `<div class="sumline" style="align-items:center;"><span>${ic} ${label}</span>${control}</div>`;
+const tgl = (key, on) => `<button class="btn" style="padding:8px 16px; font-size:13px; background:${on?'var(--teal)':'var(--page-line)'}; color:${on?'#fff':'var(--ink)'};" onclick="setPref('${key}', ${!on})">${on?'ON':'OFF'}</button>`;
+return `
+${header("Settings","Mga Setting ng App (per device)", true)}
+<main>
+<div class="banner">Settings are saved on this device only — hiwalay ang setting ng bawat telepono o laptop.</div>
+<div class="card">
+${row('Text Size','🔠', tgl('bigText', p.bigText))}
+${row('Dark Mode','🌙', tgl('dark', p.dark))}
+${row('Reduced Motion','🎬', tgl('noMotion', p.noMotion))}
+${row('Always Show Input Hints','💬', tgl('showHints', p.showHints))}
+</div>
+<div class="section-title">Security</div>
+<div class="card">
+${row('Auto-lock after idle','🔒', `<select onchange="setPref('lockMins', Number(this.value))" style="width:auto; padding:8px 10px; font-size:13px;">${[5,15,30,60].map(m=>`<option value="${m}" ${p.lockMins===m?'selected':''}>${m} min</option>`).join('')}</select>`)}
+<div class="sumline"><span>🛡️ PIN lockout</span><b>3 wrong tries = 60s cooldown</b></div>
+</div>
+<div class="section-title">About</div>
+<div class="card">
+<div class="sumline"><span>Version</span><b>${APP_VERSION}</b></div>
+<div class="sumline"><span>Printer / barcode setup</span><b>Parked — waiting for hardware</b></div>
+</div>
+</main>`;
+}
+function showInfo(text){
+const pop = document.getElementById('info-pop');
+pop.textContent = text;
+pop.style.display = 'block';
+clearTimeout(showInfo._t);
+showInfo._t = setTimeout(()=>{ pop.style.display='none'; }, 7000);
+}
+document.addEventListener('click', ()=>{
+const pop = document.getElementById('info-pop');
+if(pop && pop.style.display==='block') pop.style.display='none';
+});
+applyPrefs();
+      function renderDataTools() {
+        return `
+${header("Data Tools", "Export, Import, at Reset", true)}
+<main>
+<div class="card">
+<div class="sumline"><span>Sync status</span><b>${syncStatus === "ok" ? "Last synced OK ✓" : syncStatus === "offline" ? "Saved locally (Offline) ⏳" : syncStatus === "error" ? "Not synced yet ⚠️" : "—"}</b></div>
+<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="quickRefresh()">🔄 Refresh shared data / Kunin ang bagong data</button>
+</div>
+<div class="section-title">Exports</div>
+<div class="card">
+<button class="btn" style="width:100%; background:var(--brass); color:#fff;" onclick="downloadWordSummary()">⬇ Download Summary (Word)</button>
+<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="exportAllData()">📦 Export full app state (JSON)</button>
+<div style="display:flex; gap:8px; margin-top:8px;">
+<select id="data-table-select" style="flex:1; padding:10px;">
+<option value="dailyLogs">Daily Entries</option>
+<option value="gcashLogs">GCash Logs</option>
+<option value="payables">Payables</option>
+<option value="receivables">Suki Utang</option>
+<option value="household">Household</option>
+<option value="inventory">Inventory</option>
+<option value="householdHistory">Household History</option>
+<option value="stockHistory">Stock History</option>
+<option value="expansionLog">Expansion Log</option>
+<option value="suppliers">Suppliers</option>
+</select>
+<button class="btn" style="flex:1; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="exportRows(document.getElementById('data-table-select').value)">JSON</button>
+<button class="btn" style="flex:1; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="exportRowsCsv(document.getElementById('data-table-select').value)">CSV</button>
+</div>
+</div>
+<div class="section-title">Danger Zone</div>
+<div class="card">
+<button class="btn" style="width:100%; background:transparent; border:1.5px solid #444; color:#444;" onclick="importAllDataFromFile()">⬆️ Import state from file (JSON)</button>
+<div style="display:flex; gap:8px; margin-top:8px;">
+<button class="btn" style="flex:1; background:transparent; border:1.5px solid var(--bad); color:var(--bad);" onclick="resetData()">🗑 Reset for a Clean Slate</button>
+<button class="btn" style="flex:1; background:transparent; border:1.5px solid #666; color:#666;" onclick="toggleReadOnly()">🔒 Toggle Read-only</button>
+</div>
+<p class="subtitle" style="margin-top:6px;">Reset clears Today's Entries, GCash, Loans, and household spending totals only. Top Items and Suki Utang are always kept. Use export before risky actions.</p>
+</div>
+</main>`;
+      }
       function resetData() {
         const ok = confirm(
           "This will permanently delete Daily Entries, Gcash logs, and Loans, and zero out household 'actual' spending. Top Items will NOT be touched. Continue?",
@@ -2100,12 +2373,12 @@
     <div class="card">
       <label>Date / Petsa</label>
       <input type="date" id="d-date" value="${todayStr()}">
-      <label>Ending Cash Counted (₱) — Bilangin ang TODAY's cash lang, huwag nang ibawas ang gastos</label>
+      <label>Ending Cash Counted (₱) — Bilangin ang TODAY's cash lang <span class="info-i" onclick="event.stopPropagation(); showInfo('Count the physical cash of the current day at closing — do NOT subtract expenses on paper. Sales are computed automatically.')">i</span></label>
       <input type="number" id="d-ending" placeholder="0" inputmode="decimal">
-      <p class="subtitle" style="margin:2px 0 10px;">Count what's physically in today's pile at closing — do NOT subtract expenses on paper anymore. Sales will be calculated automatically — don't type sales directly.</p>
-      <label>Expenses paid from TODAY's cash (₱) — Karaniwang 0</label>
+      <p class="subtitle hint-opt" style="margin:2px 0 10px;">Count what's physically in today's pile at closing — do NOT subtract expenses on paper anymore. Sales will be calculated automatically — don't type sales directly.</p>
+      <label>Expenses paid from TODAY's cash (₱) — Karaniwang 0 <span class="info-i" onclick="event.stopPropagation(); showInfo('Leave 0 if the yesterday reserve paid the expenses. Fill only if the reserve ran out and purchases ate into the cash of the current day.')">i</span></label>
       <input type="number" id="d-fromtoday" placeholder="0" inputmode="decimal">
-      <p class="subtitle" style="margin:2px 0 10px;">Leave 0 kung yesterday's reserve ang nagbayad ng gastos. Fill only kapag naubos ang yesterday's pot at kumain sa today's benta ang pambili.</p>
+      <p class="subtitle hint-opt" style="margin:2px 0 10px;">Leave 0 kung yesterday's reserve ang nagbayad ng gastos. Fill only kapag naubos ang yesterday's pot at kumain sa today's benta ang pambili.</p>
       <label>Stock Purchases Out (₱) — Kabuuang Pambili, kahit saang supot bayad</label>
       <input type="number" id="d-purch" placeholder="0" inputmode="decimal">
       <label>GCash Fee Earned (₱) — Kita sa GCash</label>
@@ -3181,7 +3454,7 @@ ${[...r.history]
 
     ${
       soon.length > 0
-        ? `<div class="card" style="border:1.5px dashed var(--ink); background:#fff;">
+        ? `<div class="card" style="border:1.5px dashed var(--ink); background:var(--card);">
       <b style="color:var(--ink);">⚠️ Expiring within 7 days (${soon.length})</b>
       ${soon
         .sort((a, b) => daysUntil(a.expiryDate) - daysUntil(b.expiryDate))
@@ -3534,24 +3807,46 @@ ${[...r.history]
           if (!f) return;
           const text = await f.text();
           const rows = parseCsv(text, detectCsvDelimiter(text));
-if(rows.length < 2){ alert('CSV walang langan — need a header row plus at least one data row.'); return; }
-let headerIdx = -1;
-for(let i=0;i<Math.min(rows.length,10);i++){
-if(rows[i].map(h=>normName(h).replace(/ /g,'')).includes('name')){ headerIdx = i; break; }
-}
-if(headerIdx < 0){
-alert('Missing required column: name.\nFirst row seen: ' + (rows[0]||[]).slice(0,6).join(' | ') + '\nSave from Excel as "CSV (Comma delimited)" with the header on row 1, or use the Export Product List template.');
-return;
-}
-const header = rows[headerIdx].map(h=>normName(h).replace(/ /g,''));
-const idxOf = c => header.indexOf(c);
-const dataRows = rows.slice(headerIdx+1).map(r=>{
-const o = {};
-INV_CSV_COLS.forEach(c=>{ const i = idxOf(c); o[c] = i>=0 ? (r[i]||'').trim() : ''; });
-return o;
-});
-if(dataRows.length===0){ alert('Header OK but no data rows found below it.'); return; }
-buildCsvPlan(dataRows);
+          if (rows.length < 2) {
+            alert(
+              "CSV walang langan — need a header row plus at least one data row.",
+            );
+            return;
+          }
+          let headerIdx = -1;
+          for (let i = 0; i < Math.min(rows.length, 10); i++) {
+            if (
+              rows[i].map((h) => normName(h).replace(/ /g, "")).includes("name")
+            ) {
+              headerIdx = i;
+              break;
+            }
+          }
+          if (headerIdx < 0) {
+            alert(
+              "Missing required column: name.\nFirst row seen: " +
+                (rows[0] || []).slice(0, 6).join(" | ") +
+                '\nSave from Excel as "CSV (Comma delimited)" with the header on row 1, or use the Export Product List template.',
+            );
+            return;
+          }
+          const header = rows[headerIdx].map((h) =>
+            normName(h).replace(/ /g, ""),
+          );
+          const idxOf = (c) => header.indexOf(c);
+          const dataRows = rows.slice(headerIdx + 1).map((r) => {
+            const o = {};
+            INV_CSV_COLS.forEach((c) => {
+              const i = idxOf(c);
+              o[c] = i >= 0 ? (r[i] || "").trim() : "";
+            });
+            return o;
+          });
+          if (dataRows.length === 0) {
+            alert("Header OK but no data rows found below it.");
+            return;
+          }
+          buildCsvPlan(dataRows);
         };
         fileInput.click();
       }
@@ -5289,12 +5584,16 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
     <p class="help-p"><b>📦 Inventory</b> — hanapin gamit ang search o i-filter ayon sa Category/Storage Type. I-tap ang isang item para makita ang detalye at ma-restock, mabenta, o maireport na sira. May babala din kung malapit nang mag-expire.</p>
     <p class="help-p"><b>📈 Insights</b> — mga tsart ng Revenue/Expenses/Profit at gastos sa bahay, plus ranggo ng araw at kategorya mula pinakamataas hanggang pinakamababa.</p>
 
-    <div class="help-h">Data Tools (nasa Store Health)</div>
+    <div class="help-h">🧰 Data Tools</div>
     <p class="help-p"><b>Download Summary (Word)</b> — buod ng buwan na pwedeng i-print o ipadala.</p>
     <p class="help-p"><b>Reset for a Clean Slate</b> — buburahin ang Daily Entries, GCash, at Loans; hindi kasama ang Top Items.</p>
     
     <div class="help-h">📦 Bulk Inventory (CSV)</div>
     <p class="help-p"><b>Export Product List (CSV)</b> — buksan sa Excel, i-edit ang presyo o stock, save, then <b>Import CSV</b>. Blank cell = walang babaguhin; CLEAR = burahin ang field. Bago ma-apply, makikita mo muna ang review: Create / Update / Needs decision / Errors. Ang magkakaparehong pangalan (kahit mali ang spelling) ay itatanong muna bago gagawin.</p>
+    <div class="help-h">⚙️ Settings</div>
+<p class="help-p"><b>Settings</b> — buksan ang menu (☰) at pindutin ang ⚙️ Settings: Text Size, Dark Mode, Reduced Motion, Always Show Input Hints, at Auto-lock time. Naka-save per device ang bawat setting.</p>
+<p class="help-p"><b>🛡️ PIN lockout</b> — pag mali ang PIN ng 3 beses, may countdown (60s, mas matagal kapag inulit) bago makasubok ulit.</p>
+<p class="help-p"><b>ⓘ Info icons</b> — ang bilog na "i" sa tabi ng ilang field ay pwedeng i-tap para sa mabilisang paliwanag; o i-on ang Always Show Input Hints kung gusto ng buong teksto palagi.</p>
     <div class="help-h">Tips</div>
     ${tips.map((t) => `<div class="tip">${t}</div>`).join("")}
   </main>`;
@@ -5331,7 +5630,7 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
 
       // --- Inactivity auto-lock (v28.2.3) ---
       // Shared family phones get left unlocked on the counter; the PIN must re-engage.
-      const INACTIVITY_LOCK_MS = 15 * 60 * 1000; // 15 minutes of zero interaction
+      let INACTIVITY_LOCK_MS = 15 * 60 * 1000; // default; Settings can override per device
       let inactivityTimer = null;
 
       function lockAppForInactivity() {
