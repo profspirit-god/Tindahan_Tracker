@@ -3,6 +3,10 @@
 > Every change is recorded here, newest first. Format and rules: [`AI_INSTRUCTIONS.md`](AI_INSTRUCTIONS.md) S4. Plans: [`Roadmap.md`](Roadmap.md).
 > Entries before `Docs — 2026-11-06` are reconstructed from git history (one line each).
 
+## v31.0.1 — 2026-11-06 — Dev1-MobileHeader
+- Phase A (R-3.3, approved): narrow-phone header. Right padding was always 124px (room for the undo button even when hidden); it is now 68px and returns to 124px only while undo is visible (`body.has-undo`, toggled in `showUndoIndicator()`). At 320-430px the title is 20px and the subtitle 13px with balanced wrapping. Desktop (900px and up) untouched.
+- Files: `index.html` (`header.top` CSS, two small media blocks, one line in `showUndoIndicator()`, `APP_VERSION`), `ChangeLog.md` · Data shape touched: no · Roadmap item: R-3.3
+
 ## Docs — 2026-11-06 — Dev1-Proposals
 - Added two owner proposals under `proposals/` so every device can read them: mobile-first UI/UX refinement and family access & security architecture. Both are proposals only: not approved, nothing built.
 - `Roadmap.md`: added R-1.11 (security proposal on file) and R-3.3 (UI/UX proposal, assessed) as Proposed. `AI_INSTRUCTIONS.md` S0 file map: added the `proposals/` row.

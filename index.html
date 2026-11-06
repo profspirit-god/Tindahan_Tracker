@@ -133,7 +133,7 @@
         z-index: 5;
         background: var(--page);
         color: var(--ink);
-        padding: 14px 124px 12px 68px;
+        padding: 14px 68px 12px 68px;
         min-height: 68px;
         display: flex;
         align-items: center;
@@ -151,6 +151,24 @@
         font-size: 13.5px;
         color: var(--ink-soft);
         font-weight: 400;
+      }
+      /* phones: the undo button (left of the bell) only takes space while visible */
+      @media (max-width: 899px) {
+        body.has-undo header.top {
+          padding-right: 124px;
+        }
+      }
+      /* narrow phones (320-430px): slightly smaller title, tighter subtitle */
+      @media (max-width: 430px) {
+        header.top h1 {
+          font-size: 20px;
+          text-wrap: balance;
+        }
+        header.top p {
+          font-size: 13px;
+          line-height: 1.3;
+          text-wrap: balance;
+        }
       }
       main {
         padding: 20px 20px 12px;
@@ -1502,7 +1520,7 @@
         "Saturday",
       ];
 
-      const APP_VERSION = "v31.0.0"; // bump this by hand with each future commit
+      const APP_VERSION = "v31.0.1"; // bump this by hand with each future commit
       // ---- Design system helpers (v31) -------------------------------------
       // Line icons on a 24px grid. Names only are stored elsewhere (NAV_GROUPS,
       // NOTIF_ICONS) so nothing here can affect saved data.
@@ -2373,6 +2391,7 @@ ${link("gcash", "phone", "GCash Float")}
       function showUndoIndicator() {
         const btn = document.getElementById("undo-btn");
         if (!btn) return;
+        document.body.classList.toggle("has-undo", undoStack.length > 0);
         if (undoStack.length > 0) {
           btn.style.display = "flex";
           btn.title =
