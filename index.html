@@ -5,28 +5,76 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tindahan Tracker</title>
     <style>
-      @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap");
+      @import url("https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap");
 
+      /* =====================================================================
+         Tindahan Tracker design system (v31)
+         Black on white. Numbers are the interface. No emoji, no decoration.
+         One typeface (Work Sans). Status is never shown by colour alone:
+         every money figure carries a sign/triangle and every verdict has words.
+         Token NAMES are unchanged from v30 so inline styles keep working.
+         ===================================================================== */
       :root {
-        --cover: #0a0a0a;
-        --cover-dark: #050505;
+        /* paper + ink */
         --page: #ffffff;
-        --page-line: #e6e6e6;
-        --ink: #0a0a0a;
-        --ink-soft: #6b6b6b;
-        --brass: #0a0a0a;
-        --brass-light: #9a9a9a;
-        --teal: #7c3aed; /* Amethyst 600 */
-        --teal-dark: #6d28d9; /* Amethyst 700 */
-        --good: #2f7d5d;
-        --good-bg: #f0fdf4;
-        --bad: #c0392b;
-        --bad-bg: #fef2f2;
-        --accent-soft: #f5f3ff;
-        --accent-soft-border: #ddd6fe;
-        --accent-soft-text: #5b21b6;
-        --radius: 12px;
+        --card: #ffffff;
+        --input-bg: #ffffff;
+        --ink: #000000;
+        --ink-soft: #5e5e5e;
+        --page-line: #d9d9d9; /* hairlines between rows */
+        --field-line: #8a8a8a; /* edge of inputs and outline buttons (3:1 on white) */
+        --accent-soft: #f2f2f2; /* quiet panels */
+        --accent-soft-border: #d9d9d9;
+        --accent-soft-text: #000000;
+        /* legacy names, now pure ink so every old inline style stays monochrome */
+        --cover: #000000;
+        --cover-dark: #000000;
+        --brass: #000000;
+        --brass-light: #8a8a8a;
+        --teal: #000000; /* primary action = black fill */
+        --teal-dark: #333333;
+        /* money: the only two colours in the app */
+        --good: #1b6b3a;
+        --good-bg: #eaf4ee;
+        --bad: #b3261e;
+        --bad-bg: #fbeae8;
+        --bad-solid: #b3261e; /* solid red fills that carry white text */
+        --radius: 10px;
+        --radius-sm: 8px;
+        --sidebar-w: 280px;
+        /* icons drawn by CSS (so no emoji or glyph fonts are needed) */
+        --i-menu: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27black%27%20stroke-width=%272%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%22M4%206h16M4%2012h16M4%2018h16%22/%3E%3C/svg%3E");
+        --i-bell: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27black%27%20stroke-width=%272%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%22M6%208a6%206%200%200%201%2012%200c0%207%203%209%203%209H3s3-2%203-9%22/%3E%3Cpath%20d=%22M10.3%2021a1.94%201.94%200%200%200%203.4%200%22/%3E%3C/svg%3E");
+        --i-undo: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27black%27%20stroke-width=%272%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%22M9%2014%204%209l5-5%22/%3E%3Cpath%20d=%22M4%209h10.5a5.5%205.5%200%200%201%205.5%205.5a5.5%205.5%200%200%201-5.5%205.5H11%22/%3E%3C/svg%3E");
+        --i-x: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27black%27%20stroke-width=%272%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%22M18%206%206%2018%22/%3E%3Cpath%20d=%22m6%206%2012%2012%22/%3E%3C/svg%3E");
+        --i-check: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27black%27%20stroke-width=%272%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%22M20%206%209%2017l-5-5%22/%3E%3C/svg%3E");
+        --i-chevron: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27black%27%20stroke-width=%272%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%22m9%2018%206-6-6-6%22/%3E%3C/svg%3E");
+        --i-arrow: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27%235e5e5e%27%20stroke-width=%272.2%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%27m6%209%206%206%206-6%27/%3E%3C/svg%3E");
       }
+      body.dark-mode {
+        --page: #000000;
+        --card: #121212;
+        --input-bg: #121212;
+        --ink: #f2f2f2;
+        --ink-soft: #a3a3a3;
+        --page-line: #2c2c2c;
+        --field-line: #6e6e6e;
+        --accent-soft: #1a1a1a;
+        --accent-soft-border: #333333;
+        --accent-soft-text: #f2f2f2;
+        --cover: #000000;
+        --cover-dark: #000000;
+        --brass: #f2f2f2;
+        --brass-light: #8a8a8a;
+        --teal: #f2f2f2;
+        --teal-dark: #cfcfcf;
+        --good: #6fcf97;
+        --good-bg: #0f2418;
+        --bad: #ff8a80;
+        --bad-bg: #2a0f0d;
+        --i-arrow: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27%23a3a3a3%27%20stroke-width=%272.2%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%27m6%209%206%206%206-6%27/%3E%3C/svg%3E");
+      }
+
       * {
         box-sizing: border-box;
       }
@@ -36,12 +84,16 @@
         padding: 0;
       }
       body {
-        background: var(--cover);
-        font-family: "Inter", system-ui, sans-serif;
+        background: var(--accent-soft);
+        font-family: "Work Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
         color: var(--ink);
         min-height: 100vh;
-        min-height: 100dvh; /* dvh accounts for mobile browser chrome; vh is the fallback */
-        font-size: 17px;
+        min-height: 100dvh;
+        font-size: 16px;
+        line-height: 1.45;
+        font-variant-numeric: tabular-nums lining-nums;
+        -webkit-font-smoothing: antialiased;
+        -webkit-tap-highlight-color: transparent;
       }
       #app {
         max-width: 520px;
@@ -50,352 +102,273 @@
         min-height: 100dvh;
         background: var(--page);
         position: relative;
-        padding-bottom: 40px;
+        padding-bottom: 48px;
       }
-      #lock-screen {
-        position: fixed;
-        inset: 0;
-        background: var(--cover);
-        z-index: 999;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 16px;
-        color: var(--page);
-        font-family: "Inter", sans-serif;
-        padding: 20px;
-        text-align: center;
-      }
-      #lock-screen h2 {
-        font-family: "Space Grotesk", sans-serif;
-        margin: 0;
-      }
-      #lock-input {
-        font-size: 28px;
-        letter-spacing: 10px;
-        text-align: center;
-        width: 180px;
-        padding: 12px;
-        border-radius: 12px;
-        border: none;
-      }
-      #lock-error {
-        color: var(--bad);
-        font-size: 13px;
-        height: 16px;
-      }
-      #lock-btn {
-        background: var(--teal);
-        border: none;
-        padding: 12px 30px;
-        border-radius: 12px;
-        font-weight: 700;
-        font-size: 15px;
-        cursor: pointer;
-      }
-      #username-screen {
-        position: fixed;
-        inset: 0;
-        background: var(--cover);
-        z-index: 998;
-        display: none;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 14px;
-        color: var(--page);
-        font-family: "Inter", sans-serif;
-        margin: 0;
-      }
-      #username-screen h2 {
-        font-family: "Space Grotesk", sans-serif;
-        margin: 0;
-      }
-      #username-input {
-        font-size: 20px;
-        text-align: center;
-        width: 220px;
-        padding: 12px;
-        border-radius: 12px;
-        border: none;
-      }
-      #username-error {
-        color: var(--bad);
-        font-size: 13px;
-        min-height: 16px;
-      }
-      #username-claim {
-        background: none;
-        border: none;
-        color: var(--brass-light);
-        text-decoration: underline;
-        font-size: 12.5px;
-        cursor: pointer;
+      h1,
+      h2,
+      h3 {
+        font-family: inherit;
       }
 
+      /* ---------- keyboard + focus ---------- */
+      button:focus-visible,
+      [onclick]:focus-visible,
+      a:focus-visible,
+      summary:focus-visible {
+        outline: 3px solid var(--ink);
+        outline-offset: 2px;
+      }
+      input:focus,
+      select:focus,
+      textarea:focus {
+        outline: 2px solid var(--ink);
+        outline-offset: 1px;
+        border-color: var(--ink);
+      }
+
+      /* ---------- header ---------- */
       header.top {
-        background: var(--cover);
-        background-image: linear-gradient(
-          180deg,
-          var(--cover),
-          var(--cover-dark)
-        );
-        color: var(--page);
-        padding: 22px 20px 18px 66px;
         position: sticky;
         top: 0;
         z-index: 5;
-        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+        background: var(--page);
+        color: var(--ink);
+        padding: 14px 124px 12px 68px;
+        min-height: 68px;
+        display: flex;
+        align-items: center;
+        border-bottom: 1px solid var(--page-line);
       }
       header.top h1 {
-        font-family: "Space Grotesk", sans-serif;
-        font-size: 26px;
+        font-size: 22px;
+        line-height: 1.2;
+        font-weight: 600;
+        letter-spacing: -0.01em;
         margin: 0;
-        letter-spacing: 0.3px;
       }
       header.top p {
-        margin: 4px 0 0;
-        font-size: 13px;
-        color: var(--brass-light);
-        font-weight: 500;
-      }
-
-      .backbtn:active {
-        background: rgba(255, 255, 255, 0.25);
+        margin: 2px 0 0;
+        font-size: 13.5px;
+        color: var(--ink-soft);
+        font-weight: 400;
       }
       main {
-        padding: 18px 20px 10px;
+        padding: 20px 20px 12px;
         position: relative;
       }
-      .grid-home {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 14px;
-        margin-top: 6px;
-      }
-      .tile {
+
+      /* ---------- fixed controls: menu, bell, undo ---------- */
+      #hamburger-btn,
+      #notif-btn,
+      #undo-btn {
+        position: fixed;
+        top: 12px;
+        z-index: 30;
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        border-radius: var(--radius-sm);
         background: var(--page);
-        border: 2px solid var(--brass);
-        border-radius: var(--radius);
-        padding: 18px 12px;
-        text-align: center;
+        color: var(--ink);
+        border: 1px solid var(--field-line);
+        font-size: 0;
+        line-height: 0;
         cursor: pointer;
-        min-height: 108px;
-        display: flex;
-        flex-direction: column;
+        box-shadow: none;
+      }
+      #hamburger-btn {
+        left: 12px;
+      }
+      #notif-btn {
+        right: 12px;
+      }
+      #hamburger-btn::before,
+      #notif-btn::before,
+      #undo-btn::before {
+        content: "";
+        display: inline-block;
+        vertical-align: middle;
+        width: 22px;
+        height: 22px;
+        background: currentColor;
+        -webkit-mask: var(--m) center / contain no-repeat;
+        mask: var(--m) center / contain no-repeat;
+      }
+      #hamburger-btn::before {
+        --m: var(--i-menu);
+      }
+      #notif-btn::before {
+        --m: var(--i-bell);
+      }
+      #undo-btn::before {
+        --m: var(--i-undo);
+      }
+      /* the undo button carries inline styles from v30; these win over them */
+      #undo-btn {
+        right: 64px !important;
+        top: 12px !important;
+        width: 44px !important;
+        height: 44px !important;
+        border-radius: var(--radius-sm) !important;
+        background: var(--page) !important;
+        color: var(--ink) !important;
+        border: 1px solid var(--field-line) !important;
+        box-shadow: none !important;
+        font-size: 0 !important;
+        padding: 0 !important;
+      }
+      .notif-badge {
+        position: absolute;
+        top: -7px;
+        right: -7px;
+        background: var(--bad-solid);
+        color: #fff;
+        font-family: inherit;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1;
+        border-radius: 999px;
+        min-width: 20px;
+        height: 20px;
+        display: none;
         align-items: center;
         justify-content: center;
+        padding: 0 5px;
+        box-shadow: 0 0 0 2px var(--page);
+      }
+
+      /* ---------- sidebar ---------- */
+      #sidebar-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+        z-index: 35;
+        display: none;
+      }
+      #sidebar-overlay.open {
+        display: block;
+      }
+      #sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: var(--sidebar-w);
+        max-width: 88vw;
+        z-index: 40;
+        background: var(--page);
+        color: var(--ink);
+        border-right: 1px solid var(--page-line);
+        transform: translateX(-100%);
+        visibility: hidden;
+        transition:
+          transform 0.2s ease,
+          visibility 0s linear 0.2s;
+        display: flex;
+        flex-direction: column;
+        padding: 12px 12px 16px;
+        overflow-y: auto;
+      }
+      #sidebar.open {
+        transform: translateX(0);
+        visibility: visible;
+        transition-delay: 0s;
+      }
+      .sb-user {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
         gap: 8px;
-        transition: transform 0.12s ease;
-      }
-      .tile:active {
-        transform: scale(0.96);
-        background: var(--page-line);
-      }
-      .tile .ic {
-        font-size: 30px;
-      }
-      .tile .en {
-        font-family: "Space Grotesk", sans-serif;
+        padding: 12px 8px 14px;
+        margin-bottom: 8px;
+        border-bottom: 1px solid var(--page-line);
+        font-size: 15px;
         font-weight: 600;
-        font-size: 16px;
-        line-height: 1.2;
+        cursor: pointer;
       }
-      .tile .fil {
-        font-size: 12.5px;
+      .sb-link {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-height: 44px;
+        padding: 10px 10px;
+        margin-bottom: 2px;
+        border-radius: var(--radius-sm);
+        color: var(--ink);
+        text-decoration: none;
+        font-size: 15px;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      .sb-link:active {
+        background: var(--accent-soft);
+      }
+      .sb-link.active {
+        background: var(--ink);
+        color: var(--page);
+        font-weight: 600;
+      }
+      .sb-link .ic {
+        display: inline-flex;
+        width: 22px;
+        height: 22px;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+      }
+      .sb-link.sb-child {
+        padding-left: 44px;
+        font-weight: 400;
+        min-height: 40px;
+      }
+      .sb-link.sb-child.active {
+        font-weight: 600;
+      }
+      .sb-version {
+        margin-top: auto;
+        padding-top: 16px;
+        font-size: 12px;
         color: var(--ink-soft);
+        text-align: center;
       }
+      svg.i {
+        display: inline-block;
+        vertical-align: -0.22em;
+        flex: none;
+      }
+      .item-row-head b svg.i {
+        margin-right: 8px;
+      }
+
+      /* ---------- type ---------- */
       .section-title {
-        font-family: "Space Grotesk", sans-serif;
-        font-size: 21px;
+        font-size: 15px;
         font-weight: 600;
-        margin: 2px 0 4px;
-        color: var(--cover-dark);
+        letter-spacing: 0;
+        margin: 26px 0 8px;
+        color: var(--ink);
       }
       .subtitle {
         font-size: 13.5px;
         color: var(--ink-soft);
         margin: 0 0 14px;
       }
-      .card {
-        background: var(--card);
-        border: 1px solid var(--page-line);
-        border-radius: var(--radius);
-        padding: 16px;
-        margin-bottom: 14px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-      }
       label {
         display: block;
         font-size: 13px;
-        font-weight: 600;
+        font-weight: 500;
         color: var(--ink-soft);
-        margin: 10px 0 4px;
+        margin: 14px 0 5px;
       }
-      label:first-child {
+      .card > label:first-child,
+      .row2:first-child > div > label:first-child {
         margin-top: 0;
       }
-      input[type="text"],
-      input[type="number"],
-      input[type="date"],
-      select,
-      textarea {
-        width: 100%;
-        padding: 12px 12px;
-        font-size: 16px;
-        border: 1.5px solid var(--page-line);
-        border-radius: 10px;
-        font-family: inherit;
-        background: var(--input-bg);
-        color: var(--ink);
-      }
-      input:focus,
-      select:focus,
-      textarea:focus {
-        outline: 2px solid var(--teal);
-        border-color: var(--teal);
-      }
-      .btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        padding: 13px 18px;
-        border-radius: 12px;
-        border: none;
-        font-size: 15.5px;
-        font-weight: 700;
-        cursor: pointer;
-        font-family: inherit;
-      }
-      .btn-primary {
-        background: var(--teal);
-        color: #fff;
-        width: 100%;
-        margin-top: 14px;
-      }
-      .btn-primary:active {
-        background: var(--teal-dark);
-      }
-      .btn-ghost {
-        background: transparent;
-        color: var(--bad);
-        border: 1.5px solid var(--bad);
-        padding: 8px 14px;
-        font-size: 13.5px;
-      }
-      .entry {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 10px;
-        padding: 12px 0;
-        border-bottom: 1px dashed var(--page-line);
-      }
-      .entry:last-child {
-        border-bottom: none;
-      }
-      .entry .meta {
-        font-size: 12.5px;
-        color: var(--ink-soft);
-        margin-top: 2px;
-      }
-      .entry .amt {
-        font-weight: 700;
-        white-space: nowrap;
-      }
-      .amt.pos::before {
-        content: "▲ ";
-      }
-      .amt.neg::before {
-        content: "▼ ";
-      }
-      .pill {
-        display: inline-block;
-        font-size: 11.5px;
-        font-weight: 700;
-        padding: 3px 9px;
-        border-radius: 20px;
-        margin-left: 6px;
-      }
-      .pill.paid {
-        background: var(--good-bg);
-        color: var(--good);
-      }
-      .pill.unpaid {
-        background: var(--card);
-        color: var(--bad);
-        border: 1px solid var(--bad);
-      }
-      .pill.overdue {
-        background: var(--bad);
-        color: #fff;
-      }
-      .del {
-        background: none;
-        border: none;
-        color: var(--ink-soft);
-        font-size: 18px;
-        cursor: pointer;
-        padding: 2px 6px;
-      }
-      .stamp {
-        border: 3px solid;
-        border-radius: 14px;
-        padding: 14px 10px;
-        text-align: center;
-        font-family: "Space Grotesk", sans-serif;
-        font-weight: 700;
-        font-size: 18px;
-        letter-spacing: 1px;
-        transform: rotate(-2deg);
-        margin: 16px 0;
-      }
-      .stamp.good {
-        border-color: var(--good);
-        color: #fff;
-        background: var(--good);
-      }
-      .stamp.bad {
-        border-color: var(--bad);
-        color: var(--bad);
-        background: var(--card);
-        border-style: dashed;
-      }
-      .row2 {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-      }
-      .sumline {
-        display: flex;
-        justify-content: space-between;
-        padding: 9px 0;
-        border-bottom: 1px dashed var(--page-line);
-        font-size: 15px;
-      }
-      .sumline:last-child {
-        border: none;
-      }
-      .sumline b {
-        font-weight: 700;
-      }
-      .tip {
-        background: var(--accent-soft);
-        border-left: 4px solid var(--teal);
-        padding: 12px 14px;
-        border-radius: 8px;
-        margin-bottom: 10px;
-        font-size: 14.5px;
-        line-height: 1.5;
-      }
       .help-h {
-        font-family: "Space Grotesk", sans-serif;
         font-weight: 600;
-        font-size: 16.5px;
-        color: var(--teal-dark);
-        margin: 18px 0 6px;
+        font-size: 16px;
+        color: var(--ink);
+        margin: 22px 0 6px;
       }
       .help-p {
         font-size: 14.5px;
@@ -407,74 +380,325 @@
         text-align: center;
         color: var(--ink-soft);
         font-size: 14px;
-        padding: 20px 0;
+        padding: 22px 0;
       }
-      select {
-        appearance: auto;
+
+      /* ---------- verdict: a plain sentence, not a stamp ---------- */
+      .verdict {
+        margin: 6px 0 22px;
       }
-      .field-inline {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-        padding: 8px 0;
+      .verdict-line {
+        margin: 0;
+        font-size: 30px;
+        line-height: 1.1;
+        font-weight: 600;
+        letter-spacing: -0.02em;
       }
-      .field-inline input {
-        width: 110px;
-        text-align: right;
+      .verdict-sub {
+        margin: 6px 0 0;
+        font-size: 14px;
+        color: var(--ink-soft);
+      }
+      .verdict.good .verdict-line {
+        color: var(--good);
+      }
+      .verdict.bad .verdict-line {
+        color: var(--bad);
+      }
+      .verdict.none .verdict-line {
+        font-size: 20px;
+        font-weight: 500;
+        color: var(--ink-soft);
+      }
+
+      /* ---------- surfaces ---------- */
+      .card {
+        background: var(--card);
+        border: 1px solid var(--page-line);
+        border-radius: var(--radius);
+        padding: 16px;
+        margin-bottom: 14px;
+        box-shadow: none;
       }
       .banner {
-        font-size: 12.5px;
+        font-size: 13.5px;
+        line-height: 1.45;
         background: var(--accent-soft);
-        border: 1px solid var(--accent-soft-border);
-        color: var(--accent-soft-text);
-        padding: 8px 12px;
-        border-radius: 10px;
+        border: 1px solid var(--page-line);
+        color: var(--ink);
+        padding: 10px 12px;
+        border-radius: var(--radius-sm);
         margin-bottom: 14px;
       }
+      .tip {
+        background: var(--accent-soft);
+        padding: 12px 14px;
+        border-radius: var(--radius-sm);
+        margin-bottom: 10px;
+        font-size: 14.5px;
+        line-height: 1.55;
+      }
+      #offline-banner {
+        background: var(--accent-soft);
+        color: var(--ink);
+        text-align: center;
+        padding: 10px 12px;
+        font-size: 13.5px;
+        font-weight: 600;
+        border-bottom: 1px solid var(--field-line);
+      }
 
-      #chart-modal {
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.85);
-        z-index: 997;
-        flex-direction: column;
-        padding: 16px;
-      }
-      #chart-modal.open {
-        display: flex;
-      }
-      #chart-modal .modal-header {
+      /* ---------- rows ---------- */
+      .entry {
         display: flex;
         justify-content: space-between;
-        align-items: center;
-        margin-bottom: 14px;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--page-line);
       }
-      #chart-modal .modal-header h3 {
-        color: #fff;
-        font-family: "Space Grotesk", sans-serif;
-        margin: 0;
-        font-size: 18px;
+      .entry:last-child {
+        border-bottom: none;
       }
-      #chart-modal .modal-close {
-        background: var(--bad);
-        color: #fff;
-        border: none;
-        width: 38px;
-        height: 38px;
-        border-radius: 10px;
-        font-size: 20px;
+      .entry .meta,
+      .meta {
+        font-size: 13px;
+        color: var(--ink-soft);
+        margin-top: 2px;
       }
-      #chart-modal .modal-body {
-        flex: 1;
-        background: var(--card);
-        border-radius: 14px;
-        padding: 16px;
+      .entry .amt {
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .sumline {
         display: flex;
-        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--page-line);
+        font-size: 15px;
+      }
+      .sumline:last-child {
+        border: none;
+      }
+      .sumline b {
+        font-weight: 600;
+      }
+      .row2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      /* direction mark for money, drawn with borders so no font is involved */
+      .amt.pos::before,
+      .amt.neg::before {
+        content: "";
+        display: inline-block;
+        width: 0;
+        height: 0;
+        margin-right: 6px;
+        vertical-align: 1px;
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+      }
+      .amt.pos::before {
+        border-bottom: 6px solid currentColor;
+      }
+      .amt.neg::before {
+        border-top: 6px solid currentColor;
+      }
+      .amt.pos {
+        color: var(--good);
+      }
+      .amt.neg {
+        color: var(--bad);
       }
 
+      /* ---------- tags ---------- */
+      .pill {
+        display: inline-block;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.5;
+        padding: 1px 9px;
+        border-radius: 999px;
+        margin-left: 6px;
+        border: 1px solid currentColor;
+        background: transparent;
+      }
+      .pill.paid {
+        color: var(--good);
+        background: var(--good-bg);
+      }
+      .pill.unpaid {
+        color: var(--bad);
+        background: transparent;
+      }
+      .pill.overdue {
+        background: var(--bad-solid);
+        border-color: var(--bad-solid);
+        color: #fff;
+      }
+      .code-badge {
+        font-size: 11.5px;
+        font-weight: 600;
+        background: var(--accent-soft);
+        color: var(--ink-soft);
+        padding: 1px 7px;
+        border-radius: 4px;
+        margin-left: 6px;
+      }
+
+      /* ---------- inputs ---------- */
+      input[type="text"],
+      input[type="number"],
+      input[type="date"],
+      select,
+      textarea {
+        width: 100%;
+        min-height: 46px;
+        padding: 11px 12px;
+        font-size: 16px;
+        border: 1.5px solid var(--field-line);
+        border-radius: var(--radius-sm);
+        font-family: inherit;
+        background: var(--input-bg);
+        color: var(--ink);
+      }
+      select {
+        appearance: none;
+        -webkit-appearance: none;
+        background-image: var(--i-arrow);
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+        background-size: 16px;
+        padding-right: 38px !important;
+      }
+      ::placeholder {
+        color: var(--ink-soft);
+        opacity: 0.8;
+      }
+
+      /* ---------- buttons ---------- */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 44px;
+        padding: 11px 18px;
+        border-radius: var(--radius-sm);
+        border: 1.5px solid transparent;
+        font-size: 15.5px;
+        font-weight: 600;
+        line-height: 1.2;
+        cursor: pointer;
+        font-family: inherit;
+      }
+      .btn:active {
+        opacity: 0.8;
+      }
+      .btn-primary {
+        background: var(--teal);
+        color: #fff;
+        width: 100%;
+        margin-top: 14px;
+      }
+      .btn-primary:active {
+        background: var(--teal-dark);
+      }
+      body.dark-mode .btn-primary {
+        color: var(--page);
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--bad);
+        border: 1.5px solid var(--bad);
+        padding: 8px 14px;
+        font-size: 13.5px;
+      }
+      /* v30 buttons paint a solid black/white fill inline with white text.
+         In dark mode that fill becomes light, so the text must go dark. */
+      body.dark-mode [style*="background:var(--teal)"],
+      body.dark-mode [style*="background:var(--brass)"],
+      body.dark-mode [style*="background:var(--ink)"] {
+        color: var(--page) !important;
+      }
+      body.dark-mode [style*="background:var(--bad)"] {
+        background: var(--bad-solid) !important;
+        color: #fff !important;
+      }
+
+      /* ---------- remove / close / confirm icon buttons ---------- */
+      .del,
+      .modal-x,
+      #chart-modal .modal-close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 44px;
+        min-height: 44px;
+        padding: 0;
+        background: none;
+        border: none;
+        color: var(--ink-soft);
+        font-size: 0;
+        line-height: 0;
+        cursor: pointer;
+      }
+      .del::before,
+      .modal-x::before,
+      #chart-modal .modal-close::before {
+        content: "";
+        width: 18px;
+        height: 18px;
+        background: currentColor;
+        -webkit-mask: var(--i-x) center / contain no-repeat;
+        mask: var(--i-x) center / contain no-repeat;
+      }
+      .del.ok::before {
+        -webkit-mask-image: var(--i-check);
+        mask-image: var(--i-check);
+      }
+      .del.ok {
+        color: var(--ink);
+      }
+      .del:active {
+        color: var(--bad);
+      }
+      .modal-x {
+        border: 1px solid var(--page-line);
+        border-radius: var(--radius-sm);
+        color: var(--ink);
+      }
+      #chart-modal .modal-close {
+        background: var(--page);
+        color: var(--ink);
+        border-radius: var(--radius-sm);
+      }
+      .chevron {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        flex: none;
+        font-size: 0;
+        color: var(--ink-soft);
+        transition: transform 0.15s;
+      }
+      .chevron::before {
+        content: "";
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: currentColor;
+        -webkit-mask: var(--i-chevron) center / 16px 16px no-repeat;
+        mask: var(--i-chevron) center / 16px 16px no-repeat;
+      }
+      .chevron.open {
+        transform: rotate(90deg);
+      }
+
+      /* ---------- search, filters, item rows ---------- */
       .search-row {
         display: flex;
         gap: 8px;
@@ -491,146 +715,35 @@
       }
       .filter-row select {
         flex: 1;
-        font-size: 13px;
-        padding: 9px;
-      }
-      .code-badge {
-        font-size: 11px;
-        font-weight: 700;
-        background: var(--accent-soft);
-        color: var(--accent-soft-text);
-        padding: 2px 8px;
-        border-radius: 6px;
-        margin-left: 6px;
+        font-size: 14px;
       }
       .item-row {
         background: var(--card);
         border: 1px solid var(--page-line);
-        border-radius: 12px;
+        border-radius: var(--radius);
         margin-bottom: 10px;
         overflow: hidden;
       }
       .item-row-head {
         padding: 12px 14px;
+        min-height: 56px;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 10px;
         cursor: pointer;
       }
       .item-row-body {
         padding: 0 14px 14px;
-        border-top: 1px dashed var(--page-line);
-      }
-      .chevron {
-        transition: transform 0.15s;
-        color: var(--ink-soft);
-      }
-      .chevron.open {
-        transform: rotate(90deg);
+        border-top: 1px solid var(--page-line);
       }
 
-      :root {
-        --sidebar-w: 260px;
-      }
-      #app-shell {
-        position: relative;
-        max-width: 520px;
-        margin: 0 auto;
-      }
-      #hamburger-btn {
-        position: fixed;
-        top: 14px;
-        left: 14px;
-        z-index: 30;
-        background: var(--cover);
-        color: #fff;
-        border: none;
-        width: 42px;
-        height: 42px;
-        border-radius: 10px;
-        font-size: 20px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-      }
-      #sidebar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        bottom: 0;
-        width: var(--sidebar-w);
-        z-index: 40;
-        background: var(--cover-dark);
-        color: var(--page);
-        transform: translateX(-100%);
-        transition: transform 0.2s ease;
-        display: flex;
-        flex-direction: column;
-        padding: 18px 14px;
-        overflow-y: auto;
-      }
-      #sidebar.open {
-        transform: translateX(0);
-      }
-      #sidebar-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 35;
-        display: none;
-      }
-      #sidebar-overlay.open {
-        display: block;
-      }
-      .sb-user {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 10px 8px 18px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-        margin-bottom: 12px;
-        font-size: 13.5px;
-        font-weight: 600;
-        justify-content: space-between;
-      }
-      .sb-link {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 12px 10px;
-        border-radius: 10px;
-        color: var(--page);
-        text-decoration: none;
-        font-size: 14.5px;
-        font-weight: 600;
-        cursor: pointer;
-        margin-bottom: 2px;
-      }
-      .sb-link:active,
-      .sb-link.active {
-        background: rgba(255, 255, 255, 0.12);
-      }
-      .sb-link .ic {
-        font-size: 18px;
-        width: 22px;
-        text-align: center;
-      }
-      .sb-divider {
-        height: 1px;
-        background: rgba(255, 255, 255, 0.12);
-        margin: 10px 0;
-      }
-      .sb-version {
-        margin-top: auto;
-        padding-top: 14px;
-        font-size: 11px;
-        color: rgba(255, 255, 255, 0.5);
-        text-align: center;
-      }
-
+      /* ---------- modals ---------- */
       #item-modal-overlay {
         display: none;
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, 0.55);
+        background: rgba(0, 0, 0, 0.5);
         z-index: 996;
         align-items: flex-end;
         justify-content: center;
@@ -640,66 +753,194 @@
       }
       #item-modal-sheet {
         background: var(--page);
+        color: var(--ink);
         width: 100%;
         max-width: 520px;
         max-height: 88vh;
+        max-height: 88dvh;
         overflow-y: auto;
-        border-radius: 20px 20px 0 0;
-        padding: 20px 20px 28px;
+        border-radius: 16px 16px 0 0;
+        border-top: 1px solid var(--page-line);
+        padding: 18px 20px 28px;
       }
       .modal-title-row {
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 12px;
         margin-bottom: 12px;
       }
       .modal-title-row h3 {
-        font-family: "Space Grotesk", sans-serif;
         margin: 0;
-        color: var(--cover-dark);
-        font-size: 19px;
-      }
-      .modal-x {
-        background: var(--page-line);
-        border: none;
-        width: 34px;
-        height: 34px;
-        border-radius: 10px;
-        font-size: 16px;
         color: var(--ink);
+        font-size: 18px;
+        font-weight: 600;
+      }
+      #chart-modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 997;
+        flex-direction: column;
+        padding: 16px;
+      }
+      #chart-modal.open {
+        display: flex;
+      }
+      #chart-modal .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+      #chart-modal .modal-header h3 {
+        color: #fff;
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+      }
+      #chart-modal .modal-body {
+        flex: 1;
+        background: var(--card);
+        border-radius: var(--radius);
+        padding: 16px;
+        display: flex;
+        align-items: center;
       }
 
-      #notif-btn {
+      /* ---------- lock + sign-in screens ---------- */
+      #lock-screen,
+      #username-screen {
         position: fixed;
-        top: 14px;
-        right: 14px;
-        z-index: 30;
-        background: var(--cover);
-        color: #fff;
-        border: none;
-        width: 42px;
-        height: 42px;
-        border-radius: 10px;
-        font-size: 18px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-      }
-      .notif-badge {
-        position: absolute;
-        top: -4px;
-        right: -4px;
-        background: var(--bad);
-        color: #fff;
-        font-size: 10px;
-        font-weight: 700;
-        border-radius: 10px;
-        min-width: 18px;
-        height: 18px;
-        display: none;
+        inset: 0;
+        background: var(--page);
+        color: var(--ink);
+        flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 0 4px;
+        gap: 14px;
+        font-family: inherit;
+        padding: 24px;
+        text-align: center;
       }
-      /* --- Comfort modes (v28.6.0): larger type + reduced motion, per device --- */
+      #lock-screen {
+        z-index: 999;
+        display: flex;
+      }
+      #username-screen {
+        z-index: 998;
+        display: none;
+        margin: 0;
+      }
+      #lock-screen h2,
+      #username-screen h2 {
+        font-size: 24px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        margin: 0;
+      }
+      #lock-screen p,
+      #username-screen p {
+        margin: 0;
+        color: var(--ink-soft);
+      }
+      #lock-input,
+      #username-input {
+        text-align: center;
+        padding: 12px;
+        border-radius: var(--radius-sm);
+        border: 1.5px solid var(--field-line);
+        background: var(--input-bg);
+        color: var(--ink);
+        font-family: inherit;
+      }
+      #lock-input {
+        font-size: 28px;
+        letter-spacing: 10px;
+        width: 190px;
+      }
+      #username-input {
+        font-size: 20px;
+        width: 240px;
+      }
+      #lock-error,
+      #username-error {
+        color: var(--bad);
+        font-size: 13.5px;
+        min-height: 18px;
+      }
+      #lock-btn {
+        background: var(--teal);
+        color: #fff;
+        border: none;
+        min-height: 48px;
+        padding: 12px 32px;
+        border-radius: var(--radius-sm);
+        font-weight: 600;
+        font-size: 15.5px;
+        font-family: inherit;
+        cursor: pointer;
+      }
+      body.dark-mode #lock-btn {
+        color: var(--page);
+      }
+      #username-claim {
+        background: none;
+        border: none;
+        color: var(--ink-soft);
+        text-decoration: underline;
+        font-size: 13.5px;
+        min-height: 44px;
+        cursor: pointer;
+      }
+
+      /* ---------- field help ---------- */
+      .info-i {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: 1.5px solid var(--ink-soft);
+        color: var(--ink-soft);
+        font-size: 11px;
+        font-style: normal;
+        font-weight: 700;
+        margin-left: 6px;
+        cursor: pointer;
+        vertical-align: middle;
+      }
+      .info-i::after {
+        content: "";
+        position: absolute;
+        inset: -12px; /* 44px touch area around a 20px mark */
+      }
+      #info-pop {
+        position: fixed;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: 24px;
+        z-index: 995;
+        background: var(--ink);
+        color: var(--page);
+        padding: 12px 16px;
+        border-radius: var(--radius);
+        font-size: 13.5px;
+        line-height: 1.5;
+        max-width: 440px;
+        display: none;
+      }
+      .hint-opt {
+        display: none;
+      }
+      body.show-hints .hint-opt {
+        display: block;
+      }
+
+      /* ---------- comfort modes (carried over from v30) ---------- */
       body.big-text {
         font-size: 20px;
       }
@@ -727,11 +968,8 @@
       body.big-text .code-badge {
         font-size: 12.5px;
       }
-      body.big-text .tile .en {
-        font-size: 18px;
-      }
-      body.big-text .tile .fil {
-        font-size: 14px;
+      body.big-text .verdict-line {
+        font-size: 34px;
       }
       body.big-text input[type="text"],
       body.big-text input[type="number"],
@@ -754,7 +992,8 @@
           animation: none !important;
         }
       }
-      /* --- Desktop layout (v28.4.1): fill the screen, form left / list right --- */
+
+      /* ---------- desktop: fill the screen, form left / list right ---------- */
       .split {
         display: block;
       }
@@ -768,7 +1007,7 @@
         }
         header.top {
           padding-left: 76px;
-          padding-right: 76px;
+          padding-right: 140px;
         }
         #item-modal-sheet {
           max-width: 720px;
@@ -783,78 +1022,11 @@
           min-width: 0;
         }
       }
-      :root {
-        --card: #ffffff;
-        --input-bg: #fefdfa;
-      }
-      body.dark-mode {
-        --page: #141518;
-        --cover: #000000;
-        --cover-dark: #000000;
-        --ink: #f3f4f6;
-        --ink-soft: #9ca3af;
-        --page-line: #2b2e33;
-        --brass: #f3f4f6;
-        --brass-light: #7a8087;
-        --card: #1b1d22;
-        --input-bg: #23262c;
-        --accent-soft: #221a31;
-        --accent-soft-border: #3d2f58;
-        --accent-soft-text: #c4b5fd;
-        --good-bg: #122a20;
-        --bad-bg: #2e1613;
-      }
-      body.dark-mode #sidebar,
-      body.dark-mode .sb-link {
-        color: #f3f4f6;
-      }
-      body.dark-mode #lock-screen,
-      body.dark-mode #username-screen {
-        color: #f3f4f6;
-      }
-      .info-i {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 18px;
-        height: 18px;
-        border-radius: 50%;
-        border: 1.5px solid var(--ink-soft);
-        color: var(--ink-soft);
-        font-size: 11px;
-        font-style: normal;
-        font-weight: 700;
-        margin-left: 6px;
-        cursor: pointer;
-        vertical-align: middle;
-      }
-      #info-pop {
-        position: fixed;
-        left: 50%;
-        transform: translateX(-50%);
-        bottom: 24px;
-        z-index: 995;
-        background: var(--ink);
-        color: var(--page);
-        padding: 12px 16px;
-        border-radius: 12px;
-        font-size: 13.5px;
-        line-height: 1.5;
-        max-width: 440px;
-        display: none;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-      }
-      .hint-opt {
-        display: none;
-      }
-      body.show-hints .hint-opt {
-        display: block;
-      }
     </style>
   </head>
   <body>
     <div id="lock-screen">
-      <h2>🔒 Tindahan Tracker</h2>
+      <h2>Tindahan Tracker</h2>
       <p>Enter the family PIN</p>
       <input
         type="password"
@@ -867,14 +1039,14 @@
       <button id="lock-btn" onclick="checkPin()">Unlock</button>
     </div>
     <button id="hamburger-btn" onclick="toggleSidebar()" aria-label="Open menu">
-      ☰
+      
     </button>
     <button
       id="notif-btn"
       onclick="openNotifPanel()"
       aria-label="Notifications"
     >
-      🔔<span id="notif-badge" class="notif-badge"></span>
+      <span id="notif-badge" class="notif-badge"></span>
     </button>
     <button
       id="undo-btn"
@@ -896,27 +1068,19 @@
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
       "
     >
-      ↶
+      
     </button>
     <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
     <div id="sidebar"></div>
+    <div id="info-pop" role="status" aria-live="polite"></div>
     <div id="app-shell">
       <div
         id="offline-banner"
         role="status"
         aria-live="polite"
-        style="
-          display: none;
-          background: #fde68a;
-          color: #92400e;
-          text-align: center;
-          padding: 8px;
-          font-size: 13px;
-          font-weight: 600;
-          border-bottom: 2px solid #d97706;
-        "
+        style="display: none"
       >
-        ⚠️ Offline: Changes are saved to this device and will sync when you
+        Offline. Changes are saved to this device and will sync when you
         reconnect.
       </div>
       <div id="app"></div>
@@ -925,7 +1089,7 @@
     <div id="chart-modal">
       <div class="modal-header">
         <h3 id="modal-title"></h3>
-        <button class="modal-close" onclick="closeChartModal()">✕</button>
+        <button class="modal-close" aria-label="Close" onclick="closeChartModal()"></button>
       </div>
       <div class="modal-body"><canvas id="modalCanvas"></canvas></div>
     </div>
@@ -956,7 +1120,7 @@
     </datalist>
 
     <div id="username-screen">
-      <h2>👤 Sino Ka?</h2>
+      <h2>Sino Ka?</h2>
       <p>Enter your name (e.g. Father, Mother, Tita, your name)</p>
       <input
         type="text"
@@ -1108,7 +1272,7 @@
         codePad = { mode, name };
         const sheet = document.getElementById("item-modal-sheet");
         sheet.innerHTML = `
-<div class="modal-title-row"><h3>🔑 ${mode === "enroll" ? "Set your 4-digit code" : "Enter your code"} — ${escapeHtml(name)}</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+<div class="modal-title-row"><h3>${mode === "enroll" ? "Set your 4-digit code" : "Enter your code"} — ${escapeHtml(name)}</h3><button class="modal-x" aria-label="Close" onclick="closeItemModal()"></button></div>
 <p class="subtitle">${mode === "enroll" ? "First time for this person: choose a personal 4-digit code. Ita-type ito pagkatapos ng PIN sa bawat bagong tab." : "Personal code ng taong ito — hiwalay ito sa family PIN."}</p>
 <label>Code (4 digits)</label>
 <input type="password" id="cp-code" inputmode="numeric" maxlength="4" placeholder="••••">
@@ -1208,7 +1372,7 @@
         );
         if (taken) {
           errorE1.textContent =
-            "⚠ Username used - pick another, or confirm below if it's really you.";
+            "Username used - pick another, or confirm below if it's really you.";
           claimBtn.style.display = "inline-block";
           pendingClaimName = val;
           return;
@@ -1338,30 +1502,88 @@
         "Saturday",
       ];
 
-      const APP_VERSION = "v30.0.0"; // bump this by hand with each future commit
+      const APP_VERSION = "v31.0.0"; // bump this by hand with each future commit
+      // ---- Design system helpers (v31) -------------------------------------
+      // Line icons on a 24px grid. Names only are stored elsewhere (NAV_GROUPS,
+      // NOTIF_ICONS) so nothing here can affect saved data.
+      const ICON_PATHS = {
+        "activity": "<path d=\"M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2\"/>",
+        "calendar": "<path d=\"M8 2v4\"/><path d=\"M16 2v4\"/><rect width=\"18\" height=\"18\" x=\"3\" y=\"4\" rx=\"2\"/><path d=\"M3 10h18\"/><path d=\"m9 16 2 2 4-4\"/>",
+        "phone": "<rect width=\"14\" height=\"20\" x=\"5\" y=\"2\" rx=\"2\" ry=\"2\"/><path d=\"M12 18h.01\"/>",
+        "database": "<ellipse cx=\"12\" cy=\"5\" rx=\"9\" ry=\"3\"/><path d=\"M3 5V19A9 3 0 0 0 21 19V5\"/><path d=\"M3 12A9 3 0 0 0 21 12\"/>",
+        "users": "<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.87\"/><path d=\"M16 3.13a4 4 0 0 1 0 7.75\"/>",
+        "shield": "<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/><path d=\"m9 12 2 2 4-4\"/>",
+        "sliders": "<line x1=\"21\" x2=\"14\" y1=\"4\" y2=\"4\"/><line x1=\"10\" x2=\"3\" y1=\"4\" y2=\"4\"/><line x1=\"21\" x2=\"12\" y1=\"12\" y2=\"12\"/><line x1=\"8\" x2=\"3\" y1=\"12\" y2=\"12\"/><line x1=\"21\" x2=\"16\" y1=\"20\" y2=\"20\"/><line x1=\"12\" x2=\"3\" y1=\"20\" y2=\"20\"/><line x1=\"14\" x2=\"14\" y1=\"2\" y2=\"6\"/><line x1=\"8\" x2=\"8\" y1=\"10\" y2=\"14\"/><line x1=\"16\" x2=\"16\" y1=\"18\" y2=\"22\"/>",
+        "help": "<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\"/><path d=\"M12 17h.01\"/>",
+        "user": "<path d=\"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2\"/><circle cx=\"12\" cy=\"7\" r=\"4\"/>",
+        "package": "<path d=\"m7.5 4.27 9 5.15\"/><path d=\"M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z\"/><path d=\"m3.3 7 8.7 5 8.7-5\"/><path d=\"M12 22V12\"/>",
+        "notebook": "<path d=\"M2 6h4\"/><path d=\"M2 10h4\"/><path d=\"M2 14h4\"/><path d=\"M2 18h4\"/><rect width=\"16\" height=\"20\" x=\"4\" y=\"2\" rx=\"2\"/><path d=\"M16 2v20\"/>",
+        "wallet": "<path d=\"M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1\"/><path d=\"M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4\"/>",
+        "chart": "<line x1=\"18\" x2=\"18\" y1=\"20\" y2=\"10\"/><line x1=\"12\" x2=\"12\" y1=\"20\" y2=\"4\"/><line x1=\"6\" x2=\"6\" y1=\"20\" y2=\"14\"/>",
+        "clock": "<circle cx=\"12\" cy=\"12\" r=\"10\"/><polyline points=\"12 6 12 12 16 14\"/>",
+        "archive": "<rect width=\"20\" height=\"5\" x=\"2\" y=\"3\" rx=\"1\"/><path d=\"M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8\"/><path d=\"M10 12h4\"/>",
+        "tag": "<path d=\"M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z\"/><circle cx=\"7.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\"/>",
+        "truck": "<path d=\"M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2\"/><path d=\"M15 18H9\"/><path d=\"M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14\"/><circle cx=\"17\" cy=\"18\" r=\"2\"/><circle cx=\"7\" cy=\"18\" r=\"2\"/>",
+        "pencil": "<path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\"/><path d=\"m15 5 4 4\"/>",
+        "banknote": "<rect width=\"20\" height=\"12\" x=\"2\" y=\"6\" rx=\"2\"/><circle cx=\"12\" cy=\"12\" r=\"2\"/><path d=\"M6 12h.01M18 12h.01\"/>",
+        "percent": "<line x1=\"19\" x2=\"5\" y1=\"5\" y2=\"19\"/><circle cx=\"6.5\" cy=\"6.5\" r=\"2.5\"/><circle cx=\"17.5\" cy=\"17.5\" r=\"2.5\"/>",
+        "bell": "<path d=\"M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9\"/><path d=\"M10.3 21a1.94 1.94 0 0 0 3.4 0\"/>"
+};
+      function uiIcon(name, size) {
+        const d = ICON_PATHS[name];
+        if (!d) return "";
+        const px = size || 20;
+        return `<svg class="i" width="${px}" height="${px}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+      }
+      // Chart colours follow the light/dark theme. Greys for the pie, ink for the main line,
+      // and the same two money colours (green in / red out) used across the app.
+      function chartColors() {
+        const dark = document.body.classList.contains("dark-mode");
+        const ramp = dark
+          ? ["#f2f2f2", "#d4d4d4", "#b0b0b0", "#8c8c8c", "#6b6b6b", "#4d4d4d", "#363636", "#262626"]
+          : ["#000000", "#2e2e2e", "#575757", "#808080", "#a8a8a8", "#c9c9c9", "#e0e0e0", "#f0f0f0"];
+        return {
+          ink: ramp[0],
+          soft: dark ? "#8c8c8c" : "#8a8a8a",
+          good: dark ? "#6fcf97" : "#1b6b3a",
+          bad: dark ? "#ff8a80" : "#b3261e",
+          inkFaint: dark ? "rgba(242,242,242,0.12)" : "rgba(0,0,0,0.08)",
+          pie: ramp,
+        };
+      }
+      // One plain sentence instead of a stamp. Display only: it reads the same
+      // numbers the old stamp did and never writes anything.
+      function verdictHtml(net, hasData) {
+        if (!hasData)
+          return `<div class="verdict none"><p class="verdict-line">No entries for this month yet.</p></div>`;
+        if (net === 0)
+          return `<div class="verdict"><p class="verdict-line">Even this month</p><p class="verdict-sub">After what the family drew from the store.</p></div>`;
+        const ahead = net > 0;
+        return `<div class="verdict ${ahead ? "good" : "bad"}"><p class="verdict-line">${ahead ? "Ahead by" : "Short by"} ${peso(Math.abs(net))}</p><p class="verdict-sub">This month, after what the family drew from the store.</p></div>`;
+      }
 
       const NAV_GROUPS = [
         {
           key: "supply",
-          ic: "📦",
+          ic: "package",
           label: "Inventory & Supply",
           views: ["inventory", "suppliers"],
         },
         {
           key: "credit",
-          ic: "📘",
-          label: "Credit Book — Utang & Suki",
+          ic: "notebook",
+          label: "Credit Book (Utang & Suki)",
           views: ["payables", "receivables"],
         },
         {
           key: "family",
-          ic: "💰",
+          ic: "wallet",
           label: "Family & Growth",
           views: ["household", "expansion"],
         },
         {
           key: "reports",
-          ic: "📊",
+          ic: "chart",
           label: "Reports",
           views: ["insights", "summary"],
         },
@@ -1435,7 +1657,7 @@
         ).length;
         const sheet = document.getElementById("item-modal-sheet");
         sheet.innerHTML = `
-<div class="modal-title-row"><h3>👤 ${escapeHtml(currentUser || "—")}</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+<div class="modal-title-row"><h3>${escapeHtml(currentUser || "—")}</h3><button class="modal-x" aria-label="Close" onclick="closeItemModal()"></button></div>
 <div class="sumline"><span>My entries this month</span><b>${mine}</b></div>
 <div class="sumline"><span>Signed in on this device</span><b>${escapeHtml(localStorage.getItem("storeUsername") || "—")}</b></div>
 <p class="subtitle" style="margin-top:10px;">Role badges and personal codes arrive with Accounts & Roles (v30.0.0).</p>
@@ -1447,17 +1669,6 @@
         const sb = document.getElementById("sidebar");
         if (!sb) return;
         const open = navOpenState();
-        const icOf = (v) =>
-          ({
-            inventory: "📦",
-            suppliers: "🚚",
-            payables: "📒",
-            receivables: "🤝",
-            household: "💵",
-            expansion: "🔨",
-            insights: "📈",
-            summary: "🧾",
-          })[v] || "•";
         const labelOf = (v) =>
           ({
             inventory: "Inventory",
@@ -1469,18 +1680,19 @@
             insights: "Insights",
             summary: "Monthly Summary",
           })[v] || v;
-        const link = (v, ic, label, extra) =>
+        // ic = icon name for top-level links; child links inside a group carry no icon
+        const link = (v, ic, label, extra, child) =>
           !canView(v)
             ? ""
-            : `<div class="sb-link ${view === v ? "active" : ""}" onclick="navFromSidebar('${v}')"><span class="ic">${ic}</span> ${label}${extra || ""}</div>`;
+            : `<div class="sb-link ${child ? "sb-child" : ""} ${view === v ? "active" : ""}" onclick="navFromSidebar('${v}')">${child ? "" : `<span class="ic">${uiIcon(ic)}</span>`} ${label}${extra || ""}</div>`;
         const dot = todayLogged()
           ? ""
           : '<span style="margin-left:auto; width:8px; height:8px; border-radius:50%; background:var(--bad); display:inline-block;"></span>';
         let html = `
-<div class="sb-user" style="cursor:pointer;" onclick="renderUserPanel()">👤 ${escapeHtml(currentUser || "—")} <span style="font-size:11px; opacity:.7; margin-left:auto;">(tap for panel)</span></div>
-${link("home", "🏠", "Store Health")}
-${link("daily", "🗓️", "Today's Entry", dot)}
-${link("gcash", "📲", "GCash Float")}
+<div class="sb-user" style="cursor:pointer;" onclick="renderUserPanel()"><span style="display:flex; align-items:center; gap:10px;">${uiIcon("user")} ${escapeHtml(currentUser || "—")}</span><span style="font-size:12px; font-weight:400; color:var(--ink-soft);">Account</span></div>
+${link("home", "activity", "Store Health")}
+${link("daily", "calendar", "Today's Entry", dot)}
+${link("gcash", "phone", "GCash Float")}
 `;
         NAV_GROUPS.forEach((g) => {
           const visible = g.views.filter(canView);
@@ -1489,18 +1701,18 @@ ${link("gcash", "📲", "GCash Float")}
           const isOpen =
             open[g.key] === undefined ? containsActive : !!open[g.key];
           const badge = groupBadge(g.key);
-          html += `<div class="sb-link" onclick="toggleNavGroup('${g.key}')" style="justify-content:space-between;"><span style="display:flex; align-items:center; gap:12px;"><span class="ic">${g.ic}</span> ${g.label}</span><span style="display:flex; align-items:center; gap:8px;">${badge ? `<span class="code-badge" style="margin:0; background:var(--bad); color:#fff;">${badge}</span>` : ""}<span class="chevron ${isOpen ? "open" : ""}">▶</span></span></div>`;
+          html += `<div class="sb-link" onclick="toggleNavGroup('${g.key}')" style="justify-content:space-between;"><span style="display:flex; align-items:center; gap:12px;"><span class="ic">${uiIcon(g.ic)}</span> ${g.label}</span><span style="display:flex; align-items:center; gap:8px;">${badge ? `<span class="code-badge" style="margin:0; background:var(--bad); color:#fff;">${badge}</span>` : ""}<span class="chevron ${isOpen ? "open" : ""}"></span></span></div>`;
           if (isOpen) {
             visible.forEach((v) => {
-              html += link(v, icOf(v), labelOf(v));
+              html += link(v, "", labelOf(v), "", true);
             });
           }
         });
-        html += link("datatools", "🧰", "Data Tools");
-        html += link("people", "👥", "People & Roles");
-        html += link("audit", "🕵️", "Audit Log");
-        html += link("settings", "⚙️", "Settings");
-        html += link("help", "💡", "Help & Tips");
+        html += link("datatools", "database", "Data Tools");
+        html += link("people", "users", "People & Roles");
+        html += link("audit", "shield", "Audit Log");
+        html += link("settings", "sliders", "Settings");
+        html += link("help", "help", "Help & Tips");
         html += `<div class="sb-version">Tindahan Tracker · ${APP_VERSION}</div>`;
         sb.innerHTML = html;
       }
@@ -1521,15 +1733,15 @@ ${link("gcash", "📲", "GCash Float")}
         );
       }
       const NOTIF_ICONS = {
-        "Low Stock": "📦",
-        "Expiring Soon": "⏳",
-        "Unpaid Loan": "📒",
-        "Dead Stock": "💤",
-        "Price Alert": "💰",
-        "Supplier Today": "🚚",
-        "No Entry": "📝",
-        Uncollected: "🤝",
-        "Low Margin": "🏷️",
+        "Low Stock": "package",
+        "Expiring Soon": "clock",
+        "Unpaid Loan": "notebook",
+        "Dead Stock": "archive",
+        "Price Alert": "tag",
+        "Supplier Today": "truck",
+        "No Entry": "pencil",
+        Uncollected: "banknote",
+        "Low Margin": "percent",
       };
       let notifExpandedGroups = {};
       function getNotifications() {
@@ -1677,23 +1889,23 @@ ${link("gcash", "📲", "GCash Float")}
         });
         const sheet = document.getElementById("item-modal-sheet");
         sheet.innerHTML = `
-    <div class="modal-title-row"><h3>🔔 Notices</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+    <div class="modal-title-row"><h3>Notices</h3><button class="modal-x" aria-label="Close" onclick="closeItemModal()"></button></div>
     ${
       notifs.length === 0
         ? `<div class="empty">Walang bagong notice.</div>`
         : Object.keys(groups)
             .map((type) => {
               const isOpen = !!notifExpandedGroups[type];
-              const icon = NOTIF_ICONS[type] || "🔔";
+              const icon = uiIcon(NOTIF_ICONS[type] || "bell", 18);
               return `<div class="item-row" style="margin-bottom:8px;">
         <div class="item-row-head" onclick="toggleNotifGroup('${type}')">
           <div><b>${icon} ${type}</b> <span class="code-badge">${groups[type].length}</span></div>
-          <span class="chevron ${isOpen ? "open" : ""}">▶</span>
+          <span class="chevron ${isOpen ? "open" : ""}"></span>
         </div>
         ${
           isOpen
             ? `<div class="item-row-body">
-          ${groups[type].map((n) => `<div class="entry"><div>${escapeHtml(n.text)}</div>${n.type === "Price Alert" ? `<button class="del" onclick="ackPriceAlert(${n.alertIdx})">✓</button>` : ""}</div>`).join("")}
+          ${groups[type].map((n) => `<div class="entry"><div>${escapeHtml(n.text)}</div>${n.type === "Price Alert" ? `<button class="del ok" aria-label="Acknowledge" onclick="ackPriceAlert(${n.alertIdx})"></button>` : ""}</div>`).join("")}
         </div>`
             : ""
         }
@@ -1843,7 +2055,7 @@ ${link("gcash", "📲", "GCash Float")}
 
           if (serverSavedAt && queueSavedAt && serverSavedAt > queueSavedAt) {
             const proceed = confirm(
-              "⚠️ Data conflict!\n\nSomeone updated the data online while this device was offline.\n\nOK = Overwrite server with this device's offline changes.\nCancel = Discard offline changes and fetch server data.",
+              "Data conflict!\n\nSomeone updated the data online while this device was offline.\n\nOK = Overwrite server with this device's offline changes.\nCancel = Discard offline changes and fetch server data.",
             );
             if (!proceed) {
               localStorage.removeItem(OFFLINE_QUEUE_KEY);
@@ -1976,7 +2188,7 @@ ${link("gcash", "📲", "GCash Float")}
                 : null;
             if (serverSavedAt && serverSavedAt !== lastKnownSavedAt) {
               const proceed = confirm(
-                "⚠️ Someone else updated the data on another device since this one last loaded.\n\nSaving now may overwrite their changes.\n\nOK = Save anyway\nCancel = Don't save (refresh the page first to get the latest data)",
+                "Someone else updated the data on another device since this one last loaded.\n\nSaving now may overwrite their changes.\n\nOK = Save anyway\nCancel = Don't save (refresh the page first to get the latest data)",
               );
               if (!proceed) {
                 syncStatus = "conflict";
@@ -2358,18 +2570,18 @@ ${link("gcash", "📲", "GCash Float")}
         return `
 ${header("Store Health", "Kalusugan ng Tindahan (Staff view)")}
 <main>
-<div class="banner">Staff view — ang money figures ay nakikita lang ng Owner. ${todayLogged() ? "✅ May entry na ngayong araw." : `⚠️ Wala pang entry ngayong araw — <span style="text-decoration:underline;" onclick="go('daily')">log it now</span>`}</div>
+<div class="banner">Staff view — ang money figures ay nakikita lang ng Owner. ${todayLogged() ? "May entry na ngayong araw." : `Wala pang entry ngayong araw — <span style="text-decoration:underline;" onclick="go('daily')">log it now</span>`}</div>
 <div class="section-title">Today's Operations</div>
 <div class="card">
-<div class="sumline"><span>📦 Low stock items</span><b>${low}</b></div>
-<div class="sumline"><span>⏳ Expiring within 7 days</span><b>${exp}</b></div>
-<div class="sumline"><span>🚚 Suppliers scheduled today</span><b>${supToday.length ? escapeHtml(supToday.map((s) => s.name).join(", ")) : "None"}</b></div>
-<div class="sumline"><span>🤝 Suki due within 3 days</span><b>${sukiDue}</b></div>
+<div class="sumline"><span>Low stock items</span><b>${low}</b></div>
+<div class="sumline"><span>Expiring within 7 days</span><b>${exp}</b></div>
+<div class="sumline"><span>Suppliers scheduled today</span><b>${supToday.length ? escapeHtml(supToday.map((s) => s.name).join(", ")) : "None"}</b></div>
+<div class="sumline"><span>Suki due within 3 days</span><b>${sukiDue}</b></div>
 </div>
 <div class="section-title">Quick Actions</div>
-<button class="btn" style="width:100%; background:var(--teal); color:#fff;" onclick="go('daily')">🗓️ Today's Entry</button>
-<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="go('inventory')">📦 Inventory</button>
-<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="go('receivables')">🤝 Suki Utang</button>
+<button class="btn" style="width:100%; background:var(--teal); color:#fff;" onclick="go('daily')">Today's Entry</button>
+<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="go('inventory')">Inventory</button>
+<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="go('receivables')">Suki Utang</button>
 </main>`;
       }
       function renderHome() {
@@ -2394,15 +2606,15 @@ ${header("Store Health", "Kalusugan ng Tindahan (Staff view)")}
     <select id="home-month" onchange="changeMonth(this.value)">${monthOptions}</select>
 
     <div class="split"><div>
-    ${todayLogged() ? `<div class="banner" style="margin-top:14px;">✅ Entry logged for today</div>` : `<div class="banner" style="margin-top:14px; background:var(--bad-bg); border-color:var(--bad); color:var(--bad);">⚠️ Wala pang entry today — <span style="text-decoration:underline;" onclick="go('daily')">log it now</span></div>`}
-    <div class="stamp ${sum.net >= 0 ? "good" : "bad"}" style="margin-top:16px;">${sum.net >= 0 ? "PROFITABLE THIS MONTH" : "NEEDS ATTENTION"}</div>
+    ${todayLogged() ? `<div class="banner" style="margin-top:14px;">Entry logged for today</div>` : `<div class="banner" style="margin-top:14px; background:var(--bad-bg); border-color:var(--bad); color:var(--bad);">Wala pang entry today — <span style="text-decoration:underline;" onclick="go('daily')">log it now</span></div>`}
+    ${verdictHtml(sum.net, (sum.salesIn || 0) + (sum.purchOut || 0) + (sum.feeIn || 0) > 0)}
 
     ${
       lowStockCount > 0 || expiringSoonCount > 0
         ? `
     <div style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
-      ${lowStockCount > 0 ? `<span class="pill overdue" style="font-size:12px; padding:6px 12px; margin:0; background:var(--ink); color:#fff;">📦 ${lowStockCount} Low Stock</span>` : ""}
-      ${expiringSoonCount > 0 ? `<span class="pill overdue" style="font-size:12px; padding:6px 12px; margin:0; background:var(--bad); color:#fff;">⏳ ${expiringSoonCount} Expiring Soon</span>` : ""}
+      ${lowStockCount > 0 ? `<span class="pill overdue" style="font-size:12px; padding:6px 12px; margin:0; background:var(--ink); color:#fff;">${lowStockCount} Low Stock</span>` : ""}
+      ${expiringSoonCount > 0 ? `<span class="pill overdue" style="font-size:12px; padding:6px 12px; margin:0; background:var(--bad); color:#fff;">${expiringSoonCount} Expiring Soon</span>` : ""}
     </div>`
         : ""
     }
@@ -2418,14 +2630,14 @@ ${header("Store Health", "Kalusugan ng Tindahan (Staff view)")}
       <div class="sumline"><span>Suki Utang (uncollected)</span><b>${peso(getReceivablesTotal())}</b></div>
     </div>
 
-    <button class="btn" style="width:100%; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="quickRefresh()">🔄 Refresh shared data / Kunin ang bagong data</button>
-    <div id="last-sync" style="text-align:center; font-size:12px; color:var(--ink-soft); margin-top:8px;">${syncStatus === "ok" ? "Last synced OK ✓" : syncStatus === "offline" ? "Saved locally (Offline) ⏳" : syncStatus === "error" ? "Not synced yet ⚠️" : ""}</div>
+    <button class="btn" style="width:100%; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="quickRefresh()">Refresh shared data / Kunin ang bagong data</button>
+    <div id="last-sync" style="text-align:center; font-size:12px; color:var(--ink-soft); margin-top:8px;">${syncStatus === "ok" ? "Last synced OK " : syncStatus === "offline" ? "Saved locally (Offline) " : syncStatus === "error" ? "Not synced yet " : ""}</div>
 
     </div><div>
     <div class="section-title" style="margin-top:22px;">Quick Actions</div>
-<button class="btn" style="width:100%; background:var(--teal); color:#fff;" onclick="go('daily')">🗓️ Today's Entry</button>
-<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="go('datatools')">🧰 Data Tools</button>
-<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="go('insights')">📈 Insights</button>
+<button class="btn" style="width:100%; background:var(--teal); color:#fff;" onclick="go('daily')">Today's Entry</button>
+<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="go('datatools')">Data Tools</button>
+<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="go('insights')">Insights</button>
     </div></div>
   </main>`;
       }
@@ -2463,7 +2675,9 @@ ${header("Store Health", "Kalusugan ng Tindahan (Staff view)")}
         document.body.classList.toggle("show-hints", !!p.showHints);
         if (window.Chart) {
           Chart.defaults.color = p.dark ? "#9CA3AF" : "#6B6B6B";
-          Chart.defaults.borderColor = p.dark ? "#2B2E33" : "rgba(0,0,0,0.1)";
+          Chart.defaults.borderColor = p.dark ? "#2c2c2c" : "rgba(0,0,0,0.1)";
+          Chart.defaults.elements.arc.borderColor = p.dark ? "#000000" : "#ffffff";
+          Chart.defaults.font.family = '"Work Sans", system-ui, sans-serif';
         }
         INACTIVITY_LOCK_MS = p.lockMins * 60 * 1000;
         resetInactivityTimer();
@@ -2486,15 +2700,15 @@ ${header("Store Health", "Kalusugan ng Tindahan (Staff view)")}
         <main>
         <div class="banner">Settings are saved on this device only — hiwalay ang setting ng bawat telepono o laptop.</div>
         <div class="card">
-        ${row("Text Size", "🔠", tgl("bigText", p.bigText))}
-        ${row("Dark Mode", "🌙", tgl("dark", p.dark))}
-        ${row("Reduced Motion", "🎬", tgl("noMotion", p.noMotion))}
-        ${row("Always Show Input Hints", "💬", tgl("showHints", p.showHints))}
+        ${row("Text Size", "", tgl("bigText", p.bigText))}
+        ${row("Dark Mode", "", tgl("dark", p.dark))}
+        ${row("Reduced Motion", "", tgl("noMotion", p.noMotion))}
+        ${row("Always Show Input Hints", "", tgl("showHints", p.showHints))}
         </div>
         <div class="section-title">Security</div>
         <div class="card">
-        ${row("Auto-lock after idle", "🔒", `<select onchange="setPref('lockMins', Number(this.value))" style="width:auto; padding:8px 10px; font-size:13px;">${[5, 15, 30, 60].map((m) => `<option value="${m}" ${p.lockMins === m ? "selected" : ""}>${m} min</option>`).join("")}</select>`)}
-        <div class="sumline"><span>🛡️ PIN lockout</span><b>3 wrong tries = 60s cooldown</b></div>
+        ${row("Auto-lock after idle", "", `<select onchange="setPref('lockMins', Number(this.value))" style="width:auto; padding:8px 10px; font-size:13px;">${[5, 15, 30, 60].map((m) => `<option value="${m}" ${p.lockMins === m ? "selected" : ""}>${m} min</option>`).join("")}</select>`)}
+        <div class="sumline"><span>PIN lockout</span><b>3 wrong tries = 60s cooldown</b></div>
         </div>
         <div class="section-title">About</div>
         <div class="card">
@@ -2546,7 +2760,7 @@ ${
           <div class="entry">
           <div>
           <div><b>${escapeHtml(p.name)}</b> <span class="pill ${p.role === "Owner" ? "paid" : "unpaid"}">${p.role}</span> ${p.active ? "" : `<span class="pill overdue">Inactive</span>`}</div>
-          <div class="meta">${p.codeHash ? "Code set ✓" : "No code yet"}${p.name === currentUser ? " · this device" : ""}</div>
+          <div class="meta">${p.codeHash ? "Code set " : "No code yet"}${p.name === currentUser ? " · this device" : ""}</div>
           </div>
           <div style="display:flex; gap:6px; justify-content:flex-end; flex-wrap:wrap;">
           <button class="btn btn-ghost" style="border-color:var(--teal); color:var(--teal); padding:5px 10px; font-size:12px;" onclick="togglePersonRole(${i})">${p.role === "Owner" ? "Demote to Staff" : "Promote to Owner"}</button>
@@ -2642,7 +2856,7 @@ ${actions.map((a) => `<option value="${escapeHtml(a)}" ${fAct === a ? "selected"
 </select>
 </div>
 <div style="display:flex; gap:8px; margin-bottom:10px;">
-<button class="btn" style="flex:1; background:transparent; border:1.5px solid var(--teal); color:var(--teal); padding:10px; font-size:13px;" onclick="exportRowsCsv('auditLog')">⬇ Export CSV</button>
+<button class="btn" style="flex:1; background:transparent; border:1.5px solid var(--teal); color:var(--teal); padding:10px; font-size:13px;" onclick="exportRowsCsv('auditLog')">Export CSV</button>
 </div>
 <div class="card">
 ${
@@ -2684,13 +2898,13 @@ ${
 ${header("Data Tools", "Export, Import, at Reset", true)}
 <main>
 <div class="card">
-<div class="sumline"><span>Sync status</span><b>${syncStatus === "ok" ? "Last synced OK ✓" : syncStatus === "offline" ? "Saved locally (Offline) ⏳" : syncStatus === "error" ? "Not synced yet ⚠️" : "—"}</b></div>
-<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="quickRefresh()">🔄 Refresh shared data / Kunin ang bagong data</button>
+<div class="sumline"><span>Sync status</span><b>${syncStatus === "ok" ? "Last synced OK " : syncStatus === "offline" ? "Saved locally (Offline) " : syncStatus === "error" ? "Not synced yet " : "—"}</b></div>
+<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="quickRefresh()">Refresh shared data / Kunin ang bagong data</button>
 </div>
 <div class="section-title">Exports</div>
 <div class="card">
-<button class="btn" style="width:100%; background:var(--brass); color:#fff;" onclick="downloadWordSummary()">⬇ Download Summary (Word)</button>
-<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="exportAllData()">📦 Export full app state (JSON)</button>
+<button class="btn" style="width:100%; background:var(--brass); color:#fff;" onclick="downloadWordSummary()">Download Summary (Word)</button>
+<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="exportAllData()">Export full app state (JSON)</button>
 <div style="display:flex; gap:8px; margin-top:8px;">
 <select id="data-table-select" style="flex:1; padding:10px;">
 <option value="dailyLogs">Daily Entries</option>
@@ -2710,10 +2924,10 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
 </div>
 <div class="section-title">Danger Zone</div>
 <div class="card">
-<button class="btn" style="width:100%; background:transparent; border:1.5px solid #444; color:#444;" onclick="importAllDataFromFile()">⬆️ Import state from file (JSON)</button>
+<button class="btn" style="width:100%; background:transparent; border:1.5px solid var(--field-line); color:var(--ink);" onclick="importAllDataFromFile()">Import state from file (JSON)</button>
 <div style="display:flex; gap:8px; margin-top:8px;">
-<button class="btn" style="flex:1; background:transparent; border:1.5px solid var(--bad); color:var(--bad);" onclick="resetData()">🗑 Reset for a Clean Slate</button>
-<button class="btn" style="flex:1; background:transparent; border:1.5px solid #666; color:#666;" onclick="toggleReadOnly()">🔒 Toggle Read-only</button>
+<button class="btn" style="flex:1; background:transparent; border:1.5px solid var(--bad); color:var(--bad);" onclick="resetData()">Reset for a Clean Slate</button>
+<button class="btn" style="flex:1; background:transparent; border:1.5px solid var(--field-line); color:var(--ink);" onclick="toggleReadOnly()">Toggle Read-only</button>
 </div>
 <p class="subtitle" style="margin-top:6px;">Reset clears Today's Entries, GCash, Loans, and household spending totals only. Top Items and Suki Utang are always kept. Use export before risky actions.</p>
 </div>
@@ -2883,13 +3097,13 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
           </div>
           <div style="text-align:right;">
             <div class="amt ${net >= 0 ? "pos" : "neg"}">${peso(net)}</div>
-            <button class="del" onclick="delItem('dailyLogs', ${state.dailyLogs.indexOf(r)})">✕</button>
+            <button class="del" aria-label="Remove" onclick="delItem('dailyLogs', ${state.dailyLogs.indexOf(r)})"></button>
           </div>
         </div>`;
               })
               .join("")
       }
-      ${rows.length > dailyShowCount ? `<button class="btn" style="width:100%; background:transparent; border:1.5px solid var(--teal); color:var(--teal); margin-top:10px;" onclick="showMoreDaily()">⬇ Load ${Math.min(30, rows.length - dailyShowCount)} older entries</button>` : ""}
+      ${rows.length > dailyShowCount ? `<button class="btn" style="width:100%; background:transparent; border:1.5px solid var(--teal); color:var(--teal); margin-top:10px;" onclick="showMoreDaily()">Load ${Math.min(30, rows.length - dailyShowCount)} older entries</button>` : ""}
     </div>
     </div></div>
   </main>`;
@@ -2966,13 +3180,13 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
           </div>
           <div style="text-align:right;">
             <div class="amt pos">${peso(end)}</div>
-            <button class="del" onclick="delItem('gcashLogs', ${state.gcashLogs.indexOf(r)})">✕</button>
+            <button class="del" aria-label="Remove" onclick="delItem('gcashLogs', ${state.gcashLogs.indexOf(r)})"></button>
           </div>
         </div>`;
               })
               .join("")
       }
-      ${rows.length > gcashShowCount ? `<button class="btn" style="width:100%; background:transparent; border:1.5px solid var(--teal); color:var(--teal); margin-top:10px;" onclick="showMoreGcash()">⬇ Load ${Math.min(30, rows.length - gcashShowCount)} older entries</button>` : ""}
+      ${rows.length > gcashShowCount ? `<button class="btn" style="width:100%; background:transparent; border:1.5px solid var(--teal); color:var(--teal); margin-top:10px;" onclick="showMoreGcash()">Load ${Math.min(30, rows.length - gcashShowCount)} older entries</button>` : ""}
     </div>
     </div></div>
   </main>`;
@@ -3216,7 +3430,7 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
                     ? `<button class="btn btn-ghost" style="border-color:var(--good); color:var(--good); padding:5px 10px; font-size:12px;" onclick="openLoanPaymentModal(${idx})">Log Payment</button><button class="btn btn-ghost" style="border-color:var(--good); color:var(--good); padding:5px 10px; font-size:12px;" onclick="markPaid(${idx})">Mark Paid</button>`
                     : ""
               }
-              <button class="del" onclick="delItem('payables', ${idx})">✕</button>
+              <button class="del" aria-label="Remove" onclick="delItem('payables', ${idx})"></button>
             </div>
           </div>
         </div>`;
@@ -3342,7 +3556,7 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
         const isConsignment = p.type === "Consignment";
         const sheet = document.getElementById("item-modal-sheet");
         sheet.innerHTML = `
-    <div class="modal-title-row"><h3>${isConsignment ? "Log Remittance" : "Log Payment"} — ${escapeHtml(p.name)}</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+    <div class="modal-title-row"><h3>${isConsignment ? "Log Remittance" : "Log Payment"} — ${escapeHtml(p.name)}</h3><button class="modal-x" aria-label="Close" onclick="closeItemModal()"></button></div>
     <p class="subtitle">Balance: ${peso(balance)}</p>
     <label>${isConsignment ? "Remittance" : "Payment"} Amount (₱)</label>
     <input type="number" id="lp-amt" placeholder="0" inputmode="decimal">
@@ -3453,7 +3667,7 @@ ${paid > 0 ? `<div class="meta">Collected ${peso(paid)} of ${peso(r.amt)}</div>`
 <div class="amt pos">${peso(balance)}</div>
 <div style="margin-top:4px; display:flex; gap:6px; justify-content:flex-end;">
 ${balance > 0 ? `<button class="btn btn-ghost" style="border-color:var(--good); color:var(--good); padding:5px 10px; font-size:12px;" onclick="openReceivablePaymentModal(${idx})">Log Payment</button><button class="btn btn-ghost" style="border-color:var(--good); color:var(--good); padding:5px 10px; font-size:12px;" onclick="markCollected(${idx})">Mark Collected</button>` : ""}
-<button class="del" onclick="delItem('receivables', ${idx})">✕</button>
+<button class="del" aria-label="Remove" onclick="delItem('receivables', ${idx})"></button>
 </div>
 </div>
 </div>`;
@@ -3496,7 +3710,7 @@ ${balance > 0 ? `<button class="btn btn-ghost" style="border-color:var(--good); 
         const balance = getReceivableBalance(r);
         const sheet = document.getElementById("item-modal-sheet");
         sheet.innerHTML = `
-<div class="modal-title-row"><h3>Log Payment — ${escapeHtml(r.name)}</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+<div class="modal-title-row"><h3>Log Payment — ${escapeHtml(r.name)}</h3><button class="modal-x" aria-label="Close" onclick="closeItemModal()"></button></div>
 <p class="subtitle">Balance to collect: ${peso(balance)}</p>
 <label>Payment Amount (₱)</label>
 <input type="number" id="rp-amt" placeholder="0" inputmode="decimal">
@@ -3590,7 +3804,7 @@ ${[...r.history]
             <div class="meta">${escapeHtml(r.category || "")} · ${r.scheduleType}${r.scheduleType === "Fixed Day" ? " (" + r.scheduleDay + ")" : ""}</div>
             ${r.notes ? `<div class="meta">${escapeHtml(r.notes)}</div>` : ""}
           </div>
-          <button class="del" onclick="delItem('suppliers', ${idx})">✕</button>
+          <button class="del" aria-label="Remove" onclick="delItem('suppliers', ${idx})"></button>
         </div>`;
               })
               .join("")
@@ -3671,7 +3885,7 @@ ${[...r.history]
           </div>
           <div style="text-align:right;">
             <div class="amt neg">${peso(r.amt)}</div>
-            <button class="del" onclick="delItem('expansionLog', ${idx})">✕</button>
+            <button class="del" aria-label="Remove" onclick="delItem('expansionLog', ${idx})"></button>
           </div>
         </div>`;
               })
@@ -3713,10 +3927,10 @@ ${[...r.history]
       ${state.household
         .map(
           (h, i) => `
-        <div style="padding:10px 0; border-bottom:1px dashed var(--page-line);">
+        <div style="padding:10px 0; border-bottom:1px solid var(--page-line);">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div style="font-weight:600;">${escapeHtml(h.cat)} <span style="font-weight:400; color:var(--ink-soft); font-size:12.5px;">(${escapeHtml(h.fil)})</span></div>
-            <button class="del" onclick="delHouseholdCat(${i})">✕</button>
+            <button class="del" aria-label="Remove" onclick="delHouseholdCat(${i})"></button>
           </div>
           <div class="row2" style="margin-top:6px;">
             <div><label style="margin:0 0 3px;">Budget</label><input type="number" value="${h.budget}" onchange="updHousehold(${i},'budget',this.value)"></div>
@@ -3737,7 +3951,7 @@ ${[...r.history]
         <button class="btn" style="background:var(--brass); color:#fff;" onclick="addHouseholdCat()">+</button>
       </div>
     </div>
-    <button class="btn" style="width:100%; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="goHistoryProtected()">📜 View Entry History</button>
+    <button class="btn" style="width:100%; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="goHistoryProtected()">View Entry History</button>
     <div class="card">
       <div class="sumline"><span>Total Budget</span><b>${peso(total)}</b></div>
       <div class="sumline"><span>Total Actual</span><b>${peso(totalActual)}</b></div>
@@ -3771,7 +3985,7 @@ ${[...r.history]
             <div><b>${escapeHtml(r.cat)}</b> · ${r.field}</div>
             <div class="meta">${peso(r.oldVal)} → ${r.newVal === "DELETED" ? "DELETED" : peso(r.newVal)} · by ${escapeHtml(r.by)} · ${dtStr}</div>
           </div>
-          <button class="del" onclick="delHistoryEntry(${r._idx})">✕</button>
+          <button class="del" aria-label="Remove" onclick="delHistoryEntry(${r._idx})"></button>
         </div>`;
               })
               .join("")
@@ -3837,7 +4051,7 @@ ${[...r.history]
         const cat = state.household[i].cat;
         const sheet = document.getElementById("item-modal-sheet");
         sheet.innerHTML = `
-    <div class="modal-title-row"><h3>${mode === "add" ? "+ Add" : "− Fix"} — ${escapeHtml(cat)}</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+    <div class="modal-title-row"><h3>${mode === "add" ? "+ Add" : "− Fix"} — ${escapeHtml(cat)}</h3><button class="modal-x" aria-label="Close" onclick="closeItemModal()"></button></div>
     <p class="subtitle">${mode === "add" ? "Magkano ang idadagdag? / How much to add?" : "Magkano ang babawasin? / How much to subtract?"}</p>
     <label>Amount (₱)</label>
     <input type="number" id="hh-adjust-amt" placeholder="0" inputmode="decimal">
@@ -3955,8 +4169,8 @@ ${[...r.history]
 
     ${
       soon.length > 0
-        ? `<div class="card" style="border:1.5px dashed var(--ink); background:var(--card);">
-      <b style="color:var(--ink);">⚠️ Expiring within 7 days (${soon.length})</b>
+        ? `<div class="card" style="border:1.5px solid var(--ink); background:var(--card);">
+      <b style="color:var(--ink);">Expiring within 7 days (${soon.length})</b>
       ${soon
         .sort((a, b) => daysUntil(a.expiryDate) - daysUntil(b.expiryDate))
         .map(
@@ -3969,7 +4183,7 @@ ${[...r.history]
     }
 
     <div class="search-row">
-      <input type="text" id="inv-search-input" placeholder="🔍 Search name or code…" value="${escapeHtml(invSearch)}" oninput="setInvSearch(this.value)">
+      <input type="text" id="inv-search-input" placeholder="Search name or code…" value="${escapeHtml(invSearch)}" oninput="setInvSearch(this.value)">
     </div>
     <div class="filter-row">
       <select onchange="setInvCategoryFilter(this.value)">
@@ -3999,8 +4213,8 @@ ${[...r.history]
     </select>
     </div>
     <div style="display:flex; gap:8px; margin-bottom:10px;">
-    <button class="btn" style="flex:1; background:transparent; border:1.5px solid var(--teal); color:var(--teal); padding:10px; font-size:13px;" onclick="exportInventoryCsv()">⬇ Export Product List (CSV)</button>
-    <button class="btn" style="flex:1; background:transparent; border:1.5px solid var(--brass); color:var(--brass); padding:10px; font-size:13px;" onclick="startCsvImport()">⬆ Import CSV</button>
+    <button class="btn" style="flex:1; background:transparent; border:1.5px solid var(--teal); color:var(--teal); padding:10px; font-size:13px;" onclick="exportInventoryCsv()">Export Product List (CSV)</button>
+    <button class="btn" style="flex:1; background:transparent; border:1.5px solid var(--brass); color:var(--brass); padding:10px; font-size:13px;" onclick="startCsvImport()">Import CSV</button>
     </div>
     <button class="btn btn-primary" style="margin-bottom:6px;" onclick="openItemModal()">+ Add New Item</button>
   
@@ -4017,10 +4231,10 @@ ${[...r.history]
               return `<div class="item-row">
         <div class="item-row-head" onclick="toggleExpand(${r._idx})">
           <div>
-            <b>${escapeHtml(r.name)}</b><span class="code-badge">${r.code}</span> ${low ? `<span class="pill overdue">LOW</span>` : ""} ${dLeft !== null && dLeft <= 7 ? `<span class="pill overdue" style="background:var(--bad); color:#fff; border:1px dashed #fff;">${dLeft < 0 ? "EXPIRED" : "EXPIRING"}</span>` : ""}
+            <b>${escapeHtml(r.name)}</b><span class="code-badge">${r.code}</span> ${low ? `<span class="pill overdue">LOW</span>` : ""} ${dLeft !== null && dLeft <= 7 ? `<span class="pill overdue" style="background:var(--bad); color:#fff; border:1px solid #fff;">${dLeft < 0 ? "EXPIRED" : "EXPIRING"}</span>` : ""}
             <div class="meta">Stock: ${r.isComposite ? breakdownStock(r) : `${r.stock} ${r.unit}`} · ${r.category}</div>
           </div>
-          <span class="chevron ${isOpen ? "open" : ""}">▶</span>
+          <span class="chevron ${isOpen ? "open" : ""}"></span>
         </div>
         ${
           isOpen
@@ -4067,9 +4281,9 @@ ${[...r.history]
             <button class="btn" style="flex:1; background:var(--teal); color:#fff; padding:9px; font-size:13px;" onclick="restockItem(${r._idx})">+ Restock</button>
             <button class="btn" style="flex:1; background:var(--bad); color:#fff; padding:9px; font-size:13px;" onclick="sellItem(${r._idx})">− Sold</button>
           </div>
-          <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px dashed var(--ink); color:var(--ink); padding:9px; font-size:13px;" onclick="spoilItem(${r._idx})">🗑 Spoiled / Wasted</button>
-          <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--brass); color:var(--brass); padding:9px; font-size:13px;" onclick="openItemModal(${r._idx})">✏️ Edit Item</button>
-          <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--teal); color:var(--teal); padding:9px; font-size:13px;" onclick="openSupplierPriceModal(${r._idx})">💰 Update Supplier Price</button>
+          <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--ink); color:var(--ink); padding:9px; font-size:13px;" onclick="spoilItem(${r._idx})">Spoiled / Wasted</button>
+          <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--brass); color:var(--brass); padding:9px; font-size:13px;" onclick="openItemModal(${r._idx})">Edit Item</button>
+          <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--teal); color:var(--teal); padding:9px; font-size:13px;" onclick="openSupplierPriceModal(${r._idx})">Update Supplier Price</button>
           <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--bad); color:var(--bad); padding:9px; font-size:13px;" onclick="delItem('inventory', ${r._idx})">Delete Item</button>
         </div>`
             : ""
@@ -4079,7 +4293,7 @@ ${[...r.history]
             .join("")
     }
 
-    <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="goStockHistoryProtected()">📜 View Stock History</button>
+    <button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="goStockHistoryProtected()">View Stock History</button>
   </main>`;
       }
 
@@ -4552,7 +4766,7 @@ ${[...r.history]
         const conflicts = p.entries.filter((x) => x.kind === "conflict");
         const errors = p.entries.filter((x) => x.kind === "error");
         sheet.innerHTML = `
-<div class="modal-title-row"><h3>📥 CSV Import Review</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+<div class="modal-title-row"><h3>CSV Import Review</h3><button class="modal-x" aria-label="Close" onclick="closeItemModal()"></button></div>
 <p class="subtitle">Create ${creates.length} · Update ${updates.length} · Needs decision ${conflicts.length} · Errors ${errors.length}</p>
 ${
   conflicts.length
@@ -4586,7 +4800,7 @@ ${
 }
 ${creates.length ? `<div class="section-title">New items</div><div class="card">` + creates.map((c) => `<div class="sumline"><span>${escapeHtml(c.row.name)}</span><b>${escapeHtml(c.row.category || "Other")}</b></div>`).join("") + `</div>` : ""}
 ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="card">` + errors.map((er) => `<div class="sumline"><span>${escapeHtml(er.row.name || "row " + er.idx)}</span><b style="color:var(--bad);">${escapeHtml(er.reason)}</b></div>`).join("") + `</div>` : ""}
-<button class="btn btn-primary" onclick="applyCsvPlan()">✅ Confirm Import</button>
+<button class="btn btn-primary" onclick="applyCsvPlan()">Confirm Import</button>
 `;
         document.getElementById("item-modal-overlay").classList.add("open");
       }
@@ -4765,7 +4979,7 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
               .join("")
           : `<option value="0">${escapeHtml(item.unit)}</option>`;
         sheet.innerHTML = `
-    <div class="modal-title-row"><h3>${titleMap[action]} — ${escapeHtml(item.name)}</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+    <div class="modal-title-row"><h3>${titleMap[action]} — ${escapeHtml(item.name)}</h3><button class="modal-x" aria-label="Close" onclick="closeItemModal()"></button></div>
     <label>Unit</label>
     <select id="qty-unit">${unitOptions}</select>
     <label>Quantity</label>
@@ -4891,7 +5105,7 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
             return `<div class="card" style="padding:12px; margin-bottom:8px;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <b>Level ${i + 1}${isLast ? " (base — smallest unit)" : ""}</b>
-        ${modalCompositeLevels.length > 2 ? `<button class="del" onclick="removeLevel(${i})">✕</button>` : ""}
+        ${modalCompositeLevels.length > 2 ? `<button class="del" aria-label="Remove" onclick="removeLevel(${i})"></button>` : ""}
       </div>
       <label style="margin-top:8px;">Unit Name</label>
       <input type="text" list="unit-suggestions" value="${escapeHtml(lvl.unit)}" onchange="updateLevelField(${i},'unit',this.value)">
@@ -4994,7 +5208,7 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
             <div><b>${escapeHtml(r.item)}</b> · ${r.action}</div>
             <div class="meta">${r.oldStock} → ${r.newStock} (${r.qtyChange >= 0 ? "+" : ""}${r.qtyChange}) · by ${escapeHtml(r.by)} · ${dtStr}</div>
           </div>
-          <button class="del" onclick="delStockHistoryEntry(${r._idx})">✕</button>
+          <button class="del" aria-label="Remove" onclick="delStockHistoryEntry(${r._idx})"></button>
         </div>`;
               })
               .join("")
@@ -5057,7 +5271,7 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
         sheet.innerHTML = `
     <div class="modal-title-row">
       <h3>${item ? "Edit Item" : "Add New Item"}</h3>
-      <button class="modal-x" onclick="closeItemModal()">✕</button>
+      <button class="modal-x" aria-label="Close" onclick="closeItemModal()"></button>
     </div>
     <label>Item Name</label>
     <input type="text" id="im-name" placeholder="e.g. Marlboro Red" value="${item ? escapeHtml(item.name) : ""}">
@@ -5241,15 +5455,15 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
       }
 
       const ACTION_MAP = {
-        "A-Fast": "✅ Stock Up",
-        "A-Slow": "⚠️ Investigate",
-        "A-Dead": "🚩 Urgent Review",
-        "B-Fast": "✅ Maintain",
-        "B-Slow": "👀 Monitor",
-        "B-Dead": "⚠️ Consider Drop",
-        "C-Fast": "✅ Maintain (small qty)",
-        "C-Slow": "🗑 Consider Drop/Clearance",
-        "C-Dead": "🗑 Drop",
+        "A-Fast": "Stock Up",
+        "A-Slow": "Investigate",
+        "A-Dead": "Urgent Review",
+        "B-Fast": "Maintain",
+        "B-Slow": "Monitor",
+        "B-Dead": "Consider Drop",
+        "C-Fast": "Maintain (small qty)",
+        "C-Slow": "Consider Drop/Clearance",
+        "C-Dead": "Drop",
       };
 
       function getInventoryHealthData() {
@@ -5332,7 +5546,7 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
         const action = ACTION_MAP[`${tier}-${movement}`] || "";
         const sheet = document.getElementById("item-modal-sheet");
         sheet.innerHTML = `
-    <div class="modal-title-row"><h3>${tier} · ${movement} — ${action}</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+    <div class="modal-title-row"><h3>${tier} · ${movement} — ${action}</h3><button class="modal-x" aria-label="Close" onclick="closeItemModal()"></button></div>
     ${
       data.length === 0
         ? `<div class="empty">Walang item dito.</div>`
@@ -5353,14 +5567,14 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
         const item = state.inventory[itemIdx];
         const sheet = document.getElementById("item-modal-sheet");
         if (state.suppliers.length === 0) {
-          sheet.innerHTML = `<div class="modal-title-row"><h3>Update Supplier Price</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+          sheet.innerHTML = `<div class="modal-title-row"><h3>Update Supplier Price</h3><button class="modal-x" aria-label="Close" onclick="closeItemModal()"></button></div>
       <p class="subtitle">Add a supplier first.</p>
       <button class="btn btn-primary" onclick="closeItemModal(); go('suppliers');">Go to Suppliers</button>`;
           document.getElementById("item-modal-overlay").classList.add("open");
           return;
         }
         sheet.innerHTML = `
-    <div class="modal-title-row"><h3>Update Supplier Price — ${escapeHtml(item.name)}</h3><button class="modal-x" onclick="closeItemModal()">✕</button></div>
+    <div class="modal-title-row"><h3>Update Supplier Price — ${escapeHtml(item.name)}</h3><button class="modal-x" aria-label="Close" onclick="closeItemModal()"></button></div>
     <label>Supplier</label>
     <select id="sp-supplier">${state.suppliers.map((s) => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join("")}</select>
     <label>Quoted Price (₱)</label>
@@ -5508,7 +5722,7 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
       <div class="sumline"><span>Net After Actual Draw</span><b class="${net >= 0 ? "amt pos" : "amt neg"}">${peso(net)}</b></div>
       <div class="sumline"><span>Net If Full Budget Drawn</span><b class="${netPlanned >= 0 ? "amt pos" : "amt neg"}">${peso(netPlanned)}</b></div>
     </div>
-    <div class="stamp ${net >= 0 ? "good" : "bad"}">${net >= 0 ? "PROFITABLE THIS MONTH" : "NEEDS ATTENTION"}</div>
+    ${verdictHtml(net, (salesIn || 0) + (purchOut || 0) + (feeIn || 0) > 0)}
     <div class="card">
       <div class="sumline"><span>Unpaid Loans / Utang</span><b class="amt neg">${peso(unpaidTotal)}</b></div>
       <div class="sumline"><span>Suki Utang (uncollected)</span><b class="amt neg">${peso(getReceivablesTotal())}</b></div>
@@ -5578,18 +5792,18 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
     </div>
     <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
     Sales Day-by-Day: This Month vs ${prevLabel}
-    <button class="btn" style="background:var(--teal); color:#fff; padding:6px 12px; font-size:12px;" onclick="expandChart('salesCompare')">⤢ Expand</button>
+    <button class="btn" style="background:var(--teal); color:#fff; padding:6px 12px; font-size:12px;" onclick="expandChart('salesCompare')">Expand</button>
     </div>
     <div class="card"><canvas id="salesCompareCanvas" height="220"></canvas></div>
     <div class="section-title" style="margin-top:16px; display:flex; justify-content:space-between; align-items:center;">
     Revenue, Expenses & Profit
-      <button class="btn" style="background:var(--teal); color:#fff; padding:6px 12px; font-size:12px;" onclick="expandChart('income')">⤢ Expand</button>
+      <button class="btn" style="background:var(--teal); color:#fff; padding:6px 12px; font-size:12px;" onclick="expandChart('income')">Expand</button>
     </div>
     <div class="card"><canvas id="incomeExpenseCanvas" height="220"></canvas></div>
 
     <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
       Household Spending by Category
-      <button class="btn" style="background:var(--teal); color:#fff; padding:6px 12px; font-size:12px;" onclick="expandChart('household')">⤢ Expand</button>
+      <button class="btn" style="background:var(--teal); color:#fff; padding:6px 12px; font-size:12px;" onclick="expandChart('household')">Expand</button>
     </div>
     <div class="card"><canvas id="householdPieCanvas" height="220"></canvas></div>
 
@@ -5622,7 +5836,7 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
 
     <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
       Business Expansion (Stall) Spending
-      <button class="btn" style="background:var(--teal); color:#fff; padding:6px 12px; font-size:12px;" onclick="expandChart('expansion')">⤢ Expand</button>
+      <button class="btn" style="background:var(--teal); color:#fff; padding:6px 12px; font-size:12px;" onclick="expandChart('expansion')">Expand</button>
     </div>
     <div class="card">
       <div class="sumline"><span>Total This Month</span><b class="amt neg">${peso(getExpansionInsights(sel).total)}</b></div>
@@ -5726,23 +5940,23 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
                 {
                   label: "Revenue (Gross Income)",
                   data: daily.map((d) => d.income),
-                  borderColor: "#7C3AED",
-                  backgroundColor: "#7C3AED",
+                  borderColor: chartColors().ink,
+                  backgroundColor: chartColors().ink,
                   tension: 0.2,
                 },
                 {
                   label: "Store Expenses",
                   data: daily.map((d) => d.expense),
-                  borderColor: "#C0392B",
-                  backgroundColor: "#C0392B",
+                  borderColor: chartColors().bad,
+                  backgroundColor: chartColors().bad,
                   tension: 0.2,
                   borderDash: [4, 3],
                 },
                 {
                   label: "Profit (Net)",
                   data: daily.map((d) => d.net),
-                  borderColor: "#2F7D5D",
-                  backgroundColor: "#2F7D5D",
+                  borderColor: chartColors().good,
+                  backgroundColor: chartColors().good,
                   tension: 0.2,
                   borderDash: [2, 2],
                 },
@@ -5784,16 +5998,16 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
                 {
                   label: cLabel,
                   data: dayLabels.map((d) => curByDay[d] ?? null),
-                  borderColor: "#7C3AED",
-                  backgroundColor: "#7C3AED",
+                  borderColor: chartColors().ink,
+                  backgroundColor: chartColors().ink,
                   tension: 0.2,
                   spanGaps: true,
                 },
                 {
                   label: pLabel,
                   data: dayLabels.map((d) => prevByDay[d] ?? null),
-                  borderColor: "#9A9A9A",
-                  backgroundColor: "#9A9A9A",
+                  borderColor: chartColors().soft,
+                  backgroundColor: chartColors().soft,
                   tension: 0.2,
                   borderDash: [4, 3],
                   spanGaps: true,
@@ -5815,16 +6029,7 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
               datasets: [
                 {
                   data: household.map((h) => h.total),
-                  backgroundColor: [
-                    "#7C3AED",
-                    "#A78BFA",
-                    "#C4B5FD",
-                    "#DDD6FE",
-                    "#EDE9FE",
-                    "#F5F3FF",
-                    "#0A0A0A",
-                    "#6B6B6B",
-                  ],
+                  backgroundColor: chartColors().pie,
                 },
               ],
             },
@@ -5847,8 +6052,8 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
                   {
                     label: "Cumulative Stall Spending",
                     data: exp.cumulative.map((d) => d.cumulative),
-                    borderColor: "#7C3AED",
-                    backgroundColor: "rgba(124,58,237,0.15)",
+                    borderColor: chartColors().ink,
+                    backgroundColor: chartColors().inkFaint,
                     tension: 0.2,
                     fill: true,
                   },
@@ -5905,16 +6110,16 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
                 {
                   label: cLabel2,
                   data: labels2.map((d) => curBy2[d] ?? null),
-                  borderColor: "#7C3AED",
-                  backgroundColor: "#7C3AED",
+                  borderColor: chartColors().ink,
+                  backgroundColor: chartColors().ink,
                   tension: 0.2,
                   spanGaps: true,
                 },
                 {
                   label: pLabel2,
                   data: labels2.map((d) => prevBy2[d] ?? null),
-                  borderColor: "#9A9A9A",
-                  backgroundColor: "#9A9A9A",
+                  borderColor: chartColors().soft,
+                  backgroundColor: chartColors().soft,
                   tension: 0.2,
                   borderDash: [4, 3],
                   spanGaps: true,
@@ -5948,23 +6153,23 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
                 {
                   label: "Revenue (Gross Income)",
                   data: daily.map((d) => d.income),
-                  borderColor: "#7C3AED",
-                  backgroundColor: "#7C3AED",
+                  borderColor: chartColors().ink,
+                  backgroundColor: chartColors().ink,
                   tension: 0.2,
                 },
                 {
                   label: "Store Expenses",
                   data: daily.map((d) => d.expense),
-                  borderColor: "#C0392B",
-                  backgroundColor: "#C0392B",
+                  borderColor: chartColors().bad,
+                  backgroundColor: chartColors().bad,
                   tension: 0.2,
                   borderDash: [4, 3],
                 },
                 {
                   label: "Profit (Net)",
                   data: daily.map((d) => d.net),
-                  borderColor: "#2F7D5D",
-                  backgroundColor: "#2F7D5D",
+                  borderColor: chartColors().good,
+                  backgroundColor: chartColors().good,
                   tension: 0.2,
                   borderDash: [2, 2],
                 },
@@ -5988,16 +6193,7 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
               datasets: [
                 {
                   data: household.map((h) => h.total),
-                  backgroundColor: [
-                    "#7C3AED",
-                    "#A78BFA",
-                    "#C4B5FD",
-                    "#DDD6FE",
-                    "#EDE9FE",
-                    "#F5F3FF",
-                    "#0A0A0A",
-                    "#6B6B6B",
-                  ],
+                  backgroundColor: chartColors().pie,
                 },
               ],
             },
@@ -6021,8 +6217,8 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
                 {
                   label: "Cumulative Stall Spending",
                   data: exp.cumulative.map((d) => d.cumulative),
-                  borderColor: "#7C3AED",
-                  backgroundColor: "rgba(124,58,237,0.15)",
+                  borderColor: chartColors().ink,
+                  backgroundColor: chartColors().inkFaint,
                   tension: 0.2,
                   fill: true,
                 },
@@ -6083,10 +6279,10 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
 
     <div class="help-h">Pagpasok sa App (Getting In)</div>
     <p class="help-p"><b>PIN</b> — enter the family PIN once per device; it's remembered after that.</p>
-    <p class="help-p"><b>Pangalan (Name)</b> — the first time on a new device, type your name so every entry shows who made it. Tap your name at the top of the menu (☰) anytime to switch users on that device.</p>
+    <p class="help-p"><b>Pangalan (Name)</b> — the first time on a new device, type your name so every entry shows who made it. Tap your name at the top of the menu anytime to switch users on that device.</p>
 
-    <div class="help-h">Menu (☰)</div>
-    <p class="help-p">Tap the ☰ icon top-left anytime to open the menu — your name, Store Health, and all 7 tools are listed there. Tap outside the menu, or tap a tool, to close it. At the bottom of the menu: <b>Text Size</b> (larger type) and <b>Motion</b> (removes animations) toggles — nai-save per device, para mas komportable sa mata.</p>
+    <div class="help-h">Menu</div>
+    <p class="help-p">Tap the menu button (top-left) anytime to open the menu — your name, Store Health, and all 7 tools are listed there. Tap outside the menu, or tap a tool, to close it. At the bottom of the menu: <b>Text Size</b> (larger type) and <b>Motion</b> (removes animations) toggles — nai-save per device, para mas komportable sa mata.</p>
 
     <div class="help-h">Ang Tatlong Supot ng Pera (The 3 Pots)</div>
     <p class="help-p"><b>1. Store Cash</b> — pera para sa pagtitinda at pambili ng paninda. Kahit bayad sa supplier gamit ang GCash, dito pa rin ito ilalagay bilang Stock Purchase.</p>
@@ -6094,28 +6290,28 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
     <p class="help-p"><b>3. Household / Bahay</b> — piniling halaga bawat buwan para sa gastos ng pamilya.</p>
 
     <div class="help-h">Paano Gamitin ang Bawat Tool</div>
-    <p class="help-p"><b>🏠 Store Health</b> — ang unang makikita mo. Buod ng kita, gastos, at kung kumikita ang tindahan ngayong buwan, kasama ang paalala kung may mababang stock, malapit nang mag-expire, o may dapat bayarang utang. Dalawang numero ng net ang makikita mo: <b>Net After Actual Draw</b> (base sa talagang kinuha para sa bahay — dito base ang stamp) at <b>Net If Full Budget Drawn</b> (kung kukunin ang buong budget). Kung malayo ang pagkakaiba, tandaan na may naiwan o nadagdag sa supot ng bahay.</p>
-    <p class="help-p"><b>🗓️ Today's Entry</b> — tuwing gabi bago magsara: bilangin ang cash ng TODAY lang (huwag nang ibawas ang gastos sa papel), ilagay ang kabuuang pambili kahit saang supot galing, at kung may bahagi ng gastos na bayad mula sa today's cash mismo (karaniwang 0, kasi yesterday's reserve ang unang nagbabayad). Awtomatikong kalkulahin ang benta — huwag mag-type ng benta.</p>
-    <p class="help-p"><b>📲 GCash</b> — para lang sa cash-in/cash-out ng customer, hindi sa pambayad sa supplier.</p>
-    <p class="help-p"><b>💵 Household Budget</b> — '+ Add' kapag may bagong gastos, '− Fix' kung mali ang nailagay, ✕ para tanggalin ang kategorya. May History button na protektado ng sariling passkey.</p>
-    <p class="help-p"><b>📒 Utang / Loans</b> — bawat may utang na supplier o pautang, ilista dito para may paalala ang due date.</p>
-    <p class="help-p"><b>🤝 Suki Utang (Receivables)</b> — pera na owed sa tindahan ng suki. I-log ang partial payments habang nagbabayad sila; may paalala kapag lampas na sa promised date. Hindi ito kasama sa Revenue hangga't hindi pa nakukolekta — hiwalay ito sa mga supot ng pera.</p>
-    <p class="help-p"><b>📦 Inventory</b> — hanapin gamit ang search o i-filter ayon sa Category/Storage Type. I-tap ang isang item para makita ang detalye at ma-restock, mabenta, o maireport na sira. May babala din kung malapit nang mag-expire.</p>
-    <p class="help-p"><b>📈 Insights</b> — mga tsart ng Revenue/Expenses/Profit at gastos sa bahay, plus ranggo ng araw at kategorya mula pinakamataas hanggang pinakamababa.</p>
+    <p class="help-p"><b>Store Health</b> — ang unang makikita mo. Buod ng kita, gastos, at kung kumikita ang tindahan ngayong buwan, kasama ang paalala kung may mababang stock, malapit nang mag-expire, o may dapat bayarang utang. Dalawang numero ng net ang makikita mo: <b>Net After Actual Draw</b> (base sa talagang kinuha para sa bahay — dito base ang stamp) at <b>Net If Full Budget Drawn</b> (kung kukunin ang buong budget). Kung malayo ang pagkakaiba, tandaan na may naiwan o nadagdag sa supot ng bahay.</p>
+    <p class="help-p"><b>Today's Entry</b> — tuwing gabi bago magsara: bilangin ang cash ng TODAY lang (huwag nang ibawas ang gastos sa papel), ilagay ang kabuuang pambili kahit saang supot galing, at kung may bahagi ng gastos na bayad mula sa today's cash mismo (karaniwang 0, kasi yesterday's reserve ang unang nagbabayad). Awtomatikong kalkulahin ang benta — huwag mag-type ng benta.</p>
+    <p class="help-p"><b>GCash</b> — para lang sa cash-in/cash-out ng customer, hindi sa pambayad sa supplier.</p>
+    <p class="help-p"><b>Household Budget</b> — '+ Add' kapag may bagong gastos, '− Fix' kung mali ang nailagay, para tanggalin ang kategorya. May History button na protektado ng sariling passkey.</p>
+    <p class="help-p"><b>Utang / Loans</b> — bawat may utang na supplier o pautang, ilista dito para may paalala ang due date.</p>
+    <p class="help-p"><b>Suki Utang (Receivables)</b> — pera na owed sa tindahan ng suki. I-log ang partial payments habang nagbabayad sila; may paalala kapag lampas na sa promised date. Hindi ito kasama sa Revenue hangga't hindi pa nakukolekta — hiwalay ito sa mga supot ng pera.</p>
+    <p class="help-p"><b>Inventory</b> — hanapin gamit ang search o i-filter ayon sa Category/Storage Type. I-tap ang isang item para makita ang detalye at ma-restock, mabenta, o maireport na sira. May babala din kung malapit nang mag-expire.</p>
+    <p class="help-p"><b>Insights</b> — mga tsart ng Revenue/Expenses/Profit at gastos sa bahay, plus ranggo ng araw at kategorya mula pinakamataas hanggang pinakamababa.</p>
 
-    <div class="help-h">🧰 Data Tools</div>
+    <div class="help-h">Data Tools</div>
     <p class="help-p"><b>Download Summary (Word)</b> — buod ng buwan na pwedeng i-print o ipadala.</p>
     <p class="help-p"><b>Reset for a Clean Slate</b> — buburahin ang Daily Entries, GCash, at Loans; hindi kasama ang Top Items.</p>
     
-    <div class="help-h">📦 Bulk Inventory (CSV)</div>
+    <div class="help-h">Bulk Inventory (CSV)</div>
     <p class="help-p"><b>Export Product List (CSV)</b> — buksan sa Excel, i-edit ang presyo o stock, save, then <b>Import CSV</b>. Blank cell = walang babaguhin; CLEAR = burahin ang field. Bago ma-apply, makikita mo muna ang review: Create / Update / Needs decision / Errors. Ang magkakaparehong pangalan (kahit mali ang spelling) ay itatanong muna bago gagawin.</p>
-    <div class="help-h">👥 People & Roles</div>
+    <div class="help-h">People & Roles</div>
 <p class="help-p"><b>People & Roles</b> — Owner ang nakakakita ng lahat (kita, household, Data Tools, Audit). Staff: Today's Entry, GCash, Inventory operations, Suki Utang, at Settings comfort lang. Bawat tao may sariling 4-digit code; hash lang ang naka-store, hindi plaintext.</p>
-<p class="help-p"><b>🕵️ Audit Log</b> — owner-only list kung sino ang gumawa ng ano (delete, edit, payment, import, reset), may old → new values. Last 400 actions; may CSV export.</p>
-    <div class="help-h">⚙️ Settings</div>
-<p class="help-p"><b>Settings</b> — buksan ang menu (☰) at pindutin ang ⚙️ Settings: Text Size, Dark Mode, Reduced Motion, Always Show Input Hints, at Auto-lock time. Naka-save per device ang bawat setting.</p>
-<p class="help-p"><b>🛡️ PIN lockout</b> — pag mali ang PIN ng 3 beses, may countdown (60s, mas matagal kapag inulit) bago makasubok ulit.</p>
-<p class="help-p"><b>ⓘ Info icons</b> — ang bilog na "i" sa tabi ng ilang field ay pwedeng i-tap para sa mabilisang paliwanag; o i-on ang Always Show Input Hints kung gusto ng buong teksto palagi.</p>
+<p class="help-p"><b>Audit Log</b> — owner-only list kung sino ang gumawa ng ano (delete, edit, payment, import, reset), may old → new values. Last 400 actions; may CSV export.</p>
+    <div class="help-h">Settings</div>
+<p class="help-p"><b>Settings</b> — buksan ang menu at pindutin ang Settings: Text Size, Dark Mode, Reduced Motion, Always Show Input Hints, at Auto-lock time. Naka-save per device ang bawat setting.</p>
+<p class="help-p"><b>PIN lockout</b> — pag mali ang PIN ng 3 beses, may countdown (60s, mas matagal kapag inulit) bago makasubok ulit.</p>
+<p class="help-p"><b>Info icons</b> — ang bilog na "i" sa tabi ng ilang field ay pwedeng i-tap para sa mabilisang paliwanag; o i-on ang Always Show Input Hints kung gusto ng buong teksto palagi.</p>
     <div class="help-h">Tips</div>
     ${tips.map((t) => `<div class="tip">${t}</div>`).join("")}
   </main>`;
