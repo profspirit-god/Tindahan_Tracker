@@ -3,6 +3,11 @@
 > Every change is recorded here, newest first. Format and rules: [`AI_INSTRUCTIONS.md`](AI_INSTRUCTIONS.md) S4. Plans: [`Roadmap.md`](Roadmap.md).
 > Entries before `Docs — 2026-11-06` are reconstructed from git history (one line each).
 
+## Docs — 2026-11-06 — Dev1-Proposals
+- Added two owner proposals under `proposals/` so every device can read them: mobile-first UI/UX refinement and family access & security architecture. Both are proposals only: not approved, nothing built.
+- `Roadmap.md`: added R-1.11 (security proposal on file) and R-3.3 (UI/UX proposal, assessed) as Proposed. `AI_INSTRUCTIONS.md` S0 file map: added the `proposals/` row.
+- Files: `proposals/Tindahan_Tracker_Mobile_First_UI_UX_Improvement_Proposal.md`, `proposals/Tindahan_Tracker_Family_Access_Security_Proposal.md`, `AI_INSTRUCTIONS.md`, `Roadmap.md`, `ChangeLog.md` · No version bump, no tag (docs-only) · Data shape touched: no · Roadmap item: R-1.11, R-3.3
+
 ## Docs — 2026-11-06 — Dev1-AIDocs
 - `AI_INSTRUCTIONS.md` restructured into indexed sections S0–S13 with a task-to-section routing table; every fact now lives in one section (others point to it); all previous rules retained.
 - New rules: session protocol, token-saving read rules, changed-files-only zip layout, copy-paste Git command template (branch from `development`, PR to `development`, test, PR to `main`, tag), shared-database test rules, version/commit/ChangeLog formats, secrets handling.
