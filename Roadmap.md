@@ -34,6 +34,7 @@ Constraints for every item: easy for non-technical users (login as easy as today
 | R-1.5 | Drop `codeHash` from `state.people`; personal codes move to Auth | A 4-digit code's SHA-256 inside a readable blob can be brute-forced instantly | M | R-1.2 | Proposed |
 | R-1.10 | Move `auditLog` into an append-only table (insert-only policy) | The audit log lives inside the blob that any writer can rewrite; also capped at 400 | M | R-1.2 | Proposed |
 | R-1.9 | Content-Security-Policy meta limiting scripts/connections to the pinned CDNs and the Supabase host | Defence in depth; limited value because the single-file design needs inline scripts | S | R-1.6 | Proposed |
+| R-1.11 | Proposal on file: `proposals/Tindahan_Tracker_Family_Access_Security_Proposal.md` (per-person Supabase Auth, personal PIN per device, RLS). Assess it against R-1.2, R-1.3 and R-1.5 before any is approved | Owner-written, not yet assessed | - | R-1.2 | Proposed |
 
 ## Phase 2 — Data safety & reliability
 
@@ -49,7 +50,8 @@ Constraints for every item: easy for non-technical users (login as easy as today
 | --- | --- | --- | --- | --- |
 | R-3.1 | Edit an existing loan's fields (today: delete and recreate) | Documented gap, AI_INSTRUCTIONS S8 | M | Proposed |
 | R-3.2 | Guard against two Consignment payables linking the same Inventory item | Documented gap, S8 | S | Proposed |
-| R-3.3 | _Developer ideas: add rows here._ | | | |
+| R-3.3 | Mobile-first UI/UX refinement, per `proposals/Tindahan_Tracker_Mobile_First_UI_UX_Improvement_Proposal.md` (assessed 2026-11-06; no code written) | Owner-written proposal; assessment found a few real mobile issues (narrow-phone header, Home layout) | S-M | Proposed |
+| R-3.4 | _Developer ideas: add rows here._ | | | |
 
 ## Done
 _Nothing moved here yet. Past releases are in [`ChangeLog.md`](ChangeLog.md)._
