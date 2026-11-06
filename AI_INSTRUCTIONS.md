@@ -48,6 +48,7 @@
 | `README.md` | Human overview for GitHub visitors and new developers | what/why, tech stack, setup, Supabase SQL, feature list, "Why so simple?" rationale |
 | `Roadmap.md` | Where the app is going (secure first, then develop) | planned/proposed work and its status |
 | `ChangeLog.md` | What changed and when | every change, newest first |
+| `proposals/*.md` | Owner-written proposals waiting for assessment | the proposal text only; **not approved work**. Status of each lives in `Roadmap.md` |
 
 **Precedence when sources disagree:** developer's current explicit request > this file > `README.md` > `Roadmap.md` > `ChangeLog.md`. For facts about behaviour or the current version, `index.html` wins and the doc is corrected (S13).
 **Conflict rule:** if two instructions conflict, or a request conflicts with a rule here, **stop, state the conflict in one short message with options, and wait.** Do not silently pick one. Unattended: take the safest reading, say which one at the top of the final message.
