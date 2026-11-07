@@ -1015,6 +1015,17 @@
       .split {
         display: block;
       }
+      /* Home on phones: Quick Actions first, figures below (desktop grid unchanged) */
+      @media (max-width: 899px) {
+        .split.home-split {
+          display: flex;
+          flex-direction: column;
+        }
+        .split.home-split > .home-actions {
+          order: -1;
+          margin-bottom: 8px;
+        }
+      }
       @media (min-width: 900px) {
         #app,
         #app-shell {
@@ -1520,7 +1531,7 @@
         "Saturday",
       ];
 
-      const APP_VERSION = "v31.0.1"; // bump this by hand with each future commit
+      const APP_VERSION = "v31.0.2"; // bump this by hand with each future commit
       // ---- Design system helpers (v31) -------------------------------------
       // Line icons on a 24px grid. Names only are stored elsewhere (NAV_GROUPS,
       // NOTIF_ICONS) so nothing here can affect saved data.
@@ -2624,7 +2635,7 @@ ${header("Store Health", "Kalusugan ng Tindahan (Staff view)")}
     <label>Select Month</label>
     <select id="home-month" onchange="changeMonth(this.value)">${monthOptions}</select>
 
-    <div class="split"><div>
+    <div class="split home-split"><div>
     ${todayLogged() ? `<div class="banner" style="margin-top:14px;">Entry logged for today</div>` : `<div class="banner" style="margin-top:14px; background:var(--bad-bg); border-color:var(--bad); color:var(--bad);">Wala pang entry today — <span style="text-decoration:underline;" onclick="go('daily')">log it now</span></div>`}
     ${verdictHtml(sum.net, (sum.salesIn || 0) + (sum.purchOut || 0) + (sum.feeIn || 0) > 0)}
 
@@ -2652,10 +2663,12 @@ ${header("Store Health", "Kalusugan ng Tindahan (Staff view)")}
     <button class="btn" style="width:100%; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="quickRefresh()">Refresh shared data / Kunin ang bagong data</button>
     <div id="last-sync" style="text-align:center; font-size:12px; color:var(--ink-soft); margin-top:8px;">${syncStatus === "ok" ? "Last synced OK " : syncStatus === "offline" ? "Saved locally (Offline) " : syncStatus === "error" ? "Not synced yet " : ""}</div>
 
-    </div><div>
+    </div><div class="home-actions">
     <div class="section-title" style="margin-top:22px;">Quick Actions</div>
 <button class="btn" style="width:100%; background:var(--teal); color:#fff;" onclick="go('daily')">Today's Entry</button>
-<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="go('datatools')">Data Tools</button>
+<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="go('gcash')">GCash Float</button>
+<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="go('household')">Household Budget</button>
+<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="go('inventory')">Inventory</button>
 <button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="go('insights')">Insights</button>
     </div></div>
   </main>`;
