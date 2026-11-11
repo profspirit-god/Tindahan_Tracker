@@ -438,6 +438,32 @@
         margin-bottom: 14px;
         box-shadow: none;
       }
+      #toast-host {
+        position: fixed;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: min(92vw, 420px);
+        pointer-events: none;
+      }
+      .toast {
+        pointer-events: auto;
+        background: var(--ink);
+        color: var(--page);
+        border-radius: var(--radius-sm);
+        padding: 12px 14px;
+        font-size: 14px;
+        line-height: 1.4;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+      }
+      .toast.error {
+        background: var(--bad-solid);
+        color: #fff;
+      }
       .banner {
         font-size: 13.5px;
         line-height: 1.45;
@@ -1531,7 +1557,7 @@
         "Saturday",
       ];
 
-      const APP_VERSION = "v31.0.3"; // bump this by hand with each future commit
+      const APP_VERSION = "v31.0.4"; // bump this by hand with each future commit
       // ---- Design system helpers (v31) -------------------------------------
       // Line icons on a 24px grid. Names only are stored elsewhere (NAV_GROUPS,
       // NOTIF_ICONS) so nothing here can affect saved data.
@@ -2766,6 +2792,8 @@ ${header("Store Health", "Kalusugan ng Tindahan (Staff view)")}
           if (p.dark === undefined) p.dark = false;
           if (p.showHints === undefined) p.showHints = false;
           if (p.lockMins === undefined) p.lockMins = 15;
+          if (p.warnDuplicate === undefined) p.warnDuplicate = true;
+          if (p.zeroDetailPopup === undefined) p.zeroDetailPopup = false;
           return p;
         } catch (e) {
           return {
@@ -2774,6 +2802,8 @@ ${header("Store Health", "Kalusugan ng Tindahan (Staff view)")}
             dark: false,
             showHints: false,
             lockMins: 15,
+            warnDuplicate: true,
+            zeroDetailPopup: false,
           };
         }
       }
@@ -3172,6 +3202,8 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
     <div class="card">
       <label>Date / Petsa</label>
       <input type="date" id="d-date" value="${todayStr()}">
+      <label style="display:flex; align-items:center; gap:10px;"><input type="checkbox" id="d-closed" onchange="setDailyClosed(this.checked)" style="width:auto;"> Store closed today — Sarado ang tindahan</label>
+      <p class="subtitle hint-opt" style="margin:2px 0 10px;">Ticking this sets every amount to ₱0. You can still edit the amounts if something was sold or bought.</p>
       <label>Ending Cash Counted (₱) — Bilangin ang TODAY's cash lang <span class="info-i" onclick="event.stopPropagation(); showInfo('Count the physical cash of the current day at closing — do NOT subtract expenses on paper. Sales are computed automatically.')">i</span></label>
       <input type="number" id="d-ending" placeholder="0" inputmode="decimal">
       <p class="subtitle hint-opt" style="margin:2px 0 10px;">Count what's physically in today's pile at closing — do NOT subtract expenses on paper anymore. Sales will be calculated automatically — don't type sales directly.</p>
@@ -3206,7 +3238,7 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
                 return `<div class="entry">
           <div>
             <div><b>${r.date}</b>${balanceNote}</div>
-            <div class="meta">Sales ${peso(r.salesIn)} (Ending Cash: ${peso(r.enteredEndingCash)}${r.expFromTodayCash ? ` · from today's cash ${peso(r.expFromTodayCash)}` : ""}) · Bought ${peso(r.purchOut)} · GCash ${peso(r.fee)} · To home ${peso(r.movedDraw)} · by ${escapeHtml(r.loggedBy) || "-"}</div>
+            <div class="meta">Sales ${peso(r.salesIn)} (Ending Cash: ${peso(r.enteredEndingCash)}${r.expFromTodayCash ? ` · from today's cash ${peso(r.expFromTodayCash)}` : ""}) · Bought ${peso(r.purchOut)} · GCash ${peso(r.fee)} · To home ${peso(r.movedDraw)}${r.storeClosed ? " · Store closed" : ""} · by ${escapeHtml(r.loggedBy) || "-"}</div>
           </div>
           <div style="text-align:right;">
             <div class="amt ${net >= 0 ? "pos" : "neg"}">${peso(net)}</div>
@@ -3221,17 +3253,78 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
     </div></div>
   </main>`;
       }
+      // Small reusable toast (Phase 3 will extend this). Never claims a server result.
+      function notify(text, severity) {
+        let host = document.getElementById("toast-host");
+        if (!host) {
+          host = document.createElement("div");
+          host.id = "toast-host";
+          host.setAttribute("role", "status");
+          host.setAttribute("aria-live", "polite");
+          document.body.appendChild(host);
+        }
+        const t = document.createElement("div");
+        t.className = "toast" + (severity === "error" ? " error" : "");
+        t.textContent = text;
+        t.onclick = () => t.remove();
+        host.appendChild(t);
+        setTimeout(() => t.remove(), severity === "error" ? 9000 : 6000);
+      }
+
+      let lastDailyCommitAt = 0;
+      function setDailyClosed(on) {
+        if (!on) return;
+        ["d-ending", "d-fromtoday", "d-purch", "d-fee", "d-draw"].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) el.value = "0";
+        });
+      }
+
       function addDaily() {
+        // Guard: right after a save the form is reset, so a second tap would log a blank entry.
+        if (Date.now() - lastDailyCommitAt < 800) return;
+        if (isReadOnly) {
+          notify("Read-only mode is on. Nothing was saved.", "error");
+          return;
+        }
+        const num = (id) => parseFloat(document.getElementById(id).value) || 0;
         const date = document.getElementById("d-date").value || todayStr();
-        const endingCash =
-          parseFloat(document.getElementById("d-ending").value) || 0;
-        const fromTodayCash =
-          parseFloat(document.getElementById("d-fromtoday").value) || 0;
-        const purchOut =
-          parseFloat(document.getElementById("d-purch").value) || 0;
-        const fee = parseFloat(document.getElementById("d-fee").value) || 0;
-        const movedDraw =
-          parseFloat(document.getElementById("d-draw").value) || 0;
+        const endingCash = num("d-ending");
+        const fromTodayCash = num("d-fromtoday");
+        const purchOut = num("d-purch");
+        const fee = num("d-fee");
+        const movedDraw = num("d-draw");
+        const closedBox = document.getElementById("d-closed");
+        const storeClosed = !!(closedBox && closedBox.checked);
+
+        // Empty fields count as ₱0. Which fields are zero?
+        const money = [
+          ["Ending cash", endingCash],
+          ["Expenses from today's cash", fromTodayCash],
+          ["Stock purchases", purchOut],
+          ["GCash fee", fee],
+          ["Moved to household", movedDraw],
+        ];
+        const zeroNames = money.filter((m) => m[1] === 0).map((m) => m[0]);
+
+        if (
+          zeroNames.length === money.length &&
+          !storeClosed &&
+          !confirm(
+            "All monetary fields are ₱0. Are you sure you want to save this entry?",
+          )
+        )
+          return; // form is kept as typed
+
+        if (
+          getPrefs().warnDuplicate !== false &&
+          state.dailyLogs.some((l) => l.date === date) &&
+          !confirm(
+            `An entry already exists for ${date}. Proceed anyway? This may create a duplicate. Please review existing entries before continuing.`,
+          )
+        )
+          return; // form is kept as typed
+
         // v28.4.0 pot-aware reconstruction: today's pile only lost the expenses paid FROM it,
         // so only those get added back. Reserve/GCash-paid expenses never touched the count.
         const salesIn = endingCash + fromTodayCash + movedDraw;
@@ -3246,9 +3339,28 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
           notes: document.getElementById("d-notes").value.trim(),
           loggedBy: currentUser,
         };
+        if (storeClosed) entry.storeClosed = true;
         state.dailyLogs.push(entry);
-        saveState();
+        lastDailyCommitAt = Date.now();
+        saveState(); // writes the on-device copy synchronously, then syncs in the background
+        const keptOnDevice = hasPendingChanges();
         render();
+
+        if (!keptOnDevice) {
+          notify(
+            "Entry added, but a copy could not be kept on this device. Keep the app open until it syncs.",
+            "error",
+          );
+        } else if (storeClosed) {
+          notify("Store-closed entry saved on this device.");
+        } else if (zeroNames.length) {
+          notify("Entry saved on this device. ₱0: " + zeroNames.join(", ") + ".");
+        } else {
+          notify("Entry saved on this device.");
+        }
+        if (getPrefs().zeroDetailPopup && zeroNames.length && !storeClosed) {
+          alert("These fields were ₱0:\n- " + zeroNames.join("\n- "));
+        }
       }
 
       function renderGcash() {
