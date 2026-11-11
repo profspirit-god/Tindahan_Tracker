@@ -1531,7 +1531,7 @@
         "Saturday",
       ];
 
-      const APP_VERSION = "v31.0.2"; // bump this by hand with each future commit
+      const APP_VERSION = "v31.0.3"; // bump this by hand with each future commit
       // ---- Design system helpers (v31) -------------------------------------
       // Line icons on a 24px grid. Names only are stored elsewhere (NAV_GROUPS,
       // NOTIF_ICONS) so nothing here can affect saved data.
@@ -2054,10 +2054,45 @@ ${link("gcash", "phone", "GCash Float")}
         if (banner) banner.style.display = show ? "block" : "none";
       }
 
+      // ---- Pending-change protection (v31.0.3, fixes R1 data loss) ----
+      // The queue key holds a write-ahead copy of the whole state from the moment a save starts
+      // until the server confirms that same snapshot. While it exists, this device has changes the
+      // server has not acknowledged, so nothing may replace the in-memory state or clear the key.
+      let saveSeq = 0;
+      let savesInFlight = 0;
+      let lastSaveStartedAt = 0;
+      let processingQueue = false;
+      function hasPendingChanges() {
+        return !!localStorage.getItem(OFFLINE_QUEUE_KEY);
+      }
+      function saveBusy() {
+        // a save running over 60 s is treated as stuck so retries are never blocked forever
+        return savesInFlight > 0 && Date.now() - lastSaveStartedAt < 60000;
+      }
+      async function waitForQueueIdle() {
+        const start = Date.now();
+        while (processingQueue && Date.now() - start < 60000) {
+          await new Promise((r) => setTimeout(r, 50));
+        }
+      }
+      function stashRecoveryCopy(raw) {
+        try {
+          const key =
+            "tindahan-recovery-" + new Date().toISOString().replace(/[:.]/g, "-");
+          localStorage.setItem(key, raw);
+          const keys = Object.keys(localStorage)
+            .filter((k) => k.indexOf("tindahan-recovery-") === 0)
+            .sort();
+          while (keys.length > 5) localStorage.removeItem(keys.shift());
+        } catch (e) {
+          console.warn("Could not store recovery copy", e);
+        }
+      }
+
       window.addEventListener("online", () => {
-        if (isOfflineMode) {
+        if (isOfflineMode || hasPendingChanges()) {
           isOfflineMode = false;
-          showOfflineBanner(false);
+          showOfflineBanner(hasPendingChanges());
           processOfflineQueue();
         }
       });
@@ -2067,27 +2102,38 @@ ${link("gcash", "phone", "GCash Float")}
         showOfflineBanner(true);
       });
 
-      async function processOfflineQueue() {
+      // interactive = true: startup / reconnect (may ask the owner to decide a conflict).
+      // interactive = false: background retries (never show a dialog, never discard anything).
+      async function processOfflineQueue(interactive = true) {
+        if (processingQueue || saveBusy()) return;
         const queued = localStorage.getItem(OFFLINE_QUEUE_KEY);
         if (!queued) return;
-
+        processingQueue = true;
         try {
           const pendingState = JSON.parse(queued);
-          // Basic conflict check: if server has newer data, warn user
-          const { data: current } = await sb
+          const { data: current, error: readError } = await sb
             .from("app_state")
             .select("data")
             .eq("id", 1)
             .single();
+          if (readError) throw readError;
           const serverSavedAt = current?.data?._meta?.lastSavedAt;
           const queueSavedAt = pendingState._meta?.lastSavedAt;
 
           if (serverSavedAt && queueSavedAt && serverSavedAt > queueSavedAt) {
+            if (!interactive) {
+              syncStatus = "conflict";
+              showOfflineBanner(true);
+              return;
+            }
             const proceed = confirm(
-              "Data conflict!\n\nSomeone updated the data online while this device was offline.\n\nOK = Overwrite server with this device's offline changes.\nCancel = Discard offline changes and fetch server data.",
+              "Data conflict!\n\nSomeone updated the data online while this device was offline.\n\nOK = Overwrite server with this device's offline changes.\nCancel = Discard offline changes and fetch server data. A recovery copy stays on this device.",
             );
             if (!proceed) {
-              localStorage.removeItem(OFFLINE_QUEUE_KEY);
+              stashRecoveryCopy(queued);
+              if (localStorage.getItem(OFFLINE_QUEUE_KEY) === queued)
+                localStorage.removeItem(OFFLINE_QUEUE_KEY);
+              showOfflineBanner(false);
               await quickRefresh();
               return;
             }
@@ -2101,18 +2147,22 @@ ${link("gcash", "phone", "GCash Float")}
             .from("app_state")
             .update({ data: pendingState })
             .eq("id", 1);
-          if (!error) {
+          if (error) throw error;
+          if (!lastKnownSavedAt || now > lastKnownSavedAt) lastKnownSavedAt = now;
+          // Clear only if nothing newer was queued while this request was running.
+          if (localStorage.getItem(OFFLINE_QUEUE_KEY) === queued) {
             localStorage.removeItem(OFFLINE_QUEUE_KEY);
             state = pendingState;
-            lastKnownSavedAt = now;
             syncStatus = "ok";
+            showOfflineBanner(false);
             render();
-            console.log("Offline queue successfully synced.");
-          } else {
-            console.error("Failed to sync offline queue", error);
           }
         } catch (e) {
           console.error("Error processing offline queue", e);
+          syncStatus = "offline";
+          showOfflineBanner(true);
+        } finally {
+          processingQueue = false;
         }
       }
 
@@ -2147,25 +2197,39 @@ ${link("gcash", "phone", "GCash Float")}
       }
 
       async function loadState() {
-        // If offline and we have a queue, use the queue so the app still works!
-        if (!navigator.onLine && localStorage.getItem(OFFLINE_QUEUE_KEY)) {
+        // R1: never replace local state that holds changes the server has not confirmed.
+        let pendingRaw = localStorage.getItem(OFFLINE_QUEUE_KEY);
+        if (pendingRaw && !loaded) {
+          // first load of this session: the pending copy is the working state
           try {
-            state = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY));
-            syncStatus = "offline";
-            showOfflineBanner(true);
-            loaded = true;
-            return;
+            state = JSON.parse(pendingRaw);
           } catch (e) {
             console.warn("Failed to parse offline queue", e);
+            stashRecoveryCopy(pendingRaw);
+            localStorage.removeItem(OFFLINE_QUEUE_KEY);
+            pendingRaw = null;
           }
         }
+        if (pendingRaw) {
+          if (syncStatus !== "conflict") syncStatus = "offline";
+          showOfflineBanner(true);
+          loaded = true;
+          // quiet background retry: no dialogs, never discards anything
+          if (navigator.onLine && !isOfflineMode && syncStatus !== "conflict") {
+            processOfflineQueue(false);
+          }
+          return;
+        }
 
+        const seqAtStart = saveSeq;
         try {
           const { data, error } = await sb
             .from("app_state")
             .select("data")
             .eq("id", 1)
             .single();
+          // A save started while this request was running: the server copy is already stale.
+          if (loaded && (saveSeq !== seqAtStart || hasPendingChanges())) return;
           if (!error && data.data) {
             state = Object.assign(state, data.data);
             if (!state.household || state.household.length === 0) {
@@ -2195,15 +2259,34 @@ ${link("gcash", "phone", "GCash Float")}
         const now = new Date().toISOString();
         state._meta = { lastSavedAt: now, lastSavedBy: currentUser };
 
-        // If offline, save to queue immediately
+        // Write-ahead: keep a durable full copy until the server confirms exactly this snapshot.
+        const snap = JSON.stringify(state);
+        const mySeq = ++saveSeq;
+        try {
+          localStorage.setItem(OFFLINE_QUEUE_KEY, snap);
+        } catch (e) {
+          console.warn("Could not write local pending copy", e);
+        }
+        savesInFlight++;
+        lastSaveStartedAt = Date.now();
+        try {
+          await pushStateToServer(snap, mySeq, now);
+        } finally {
+          savesInFlight--;
+        }
+      }
+
+      async function pushStateToServer(snap, mySeq, now) {
+        await waitForQueueIdle(); // never race a background replay of an older copy
+
+        // If offline, the write-ahead copy already holds the data
         if (!navigator.onLine || isOfflineMode) {
-          localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(state));
           syncStatus = "offline";
           showOfflineBanner(true);
           return;
         }
 
-        if (lastKnownSavedAt) {
+        if (lastKnownSavedAt || syncStatus === "conflict") {
           try {
             const { data: current, error } = await sb
               .from("app_state")
@@ -2220,36 +2303,34 @@ ${link("gcash", "phone", "GCash Float")}
                 "Someone else updated the data on another device since this one last loaded.\n\nSaving now may overwrite their changes.\n\nOK = Save anyway\nCancel = Don't save (refresh the page first to get the latest data)",
               );
               if (!proceed) {
-                syncStatus = "conflict";
+                syncStatus = "conflict"; // the pending copy stays on this device
                 return;
               }
             }
           } catch (e) {
-            // Network error during conflict check -> queue it
-            console.warn(
-              "Network error during save check, queueing offline.",
-              e,
-            );
-            localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(state));
+            // Network error during conflict check -> stays pending on this device
+            console.warn("Network error during save check, keeping pending copy.", e);
             syncStatus = "offline";
             showOfflineBanner(true);
             return;
           }
         }
 
-        lastKnownSavedAt = now;
         try {
           const { error } = await sb
             .from("app_state")
-            .update({ data: state })
+            .update({ data: JSON.parse(snap) })
             .eq("id", 1);
           if (error) throw error;
-          syncStatus = "ok";
-          localStorage.removeItem(OFFLINE_QUEUE_KEY); // Clear queue on successful save
-          showOfflineBanner(false);
+          if (!lastKnownSavedAt || now > lastKnownSavedAt) lastKnownSavedAt = now;
+          // Clear the pending copy only when no newer save has started since this one.
+          if (mySeq === saveSeq) {
+            localStorage.removeItem(OFFLINE_QUEUE_KEY);
+            syncStatus = "ok";
+            showOfflineBanner(false);
+          }
         } catch (e) {
-          console.warn("Save failed, queueing offline.", e);
-          localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(state));
+          console.warn("Save failed, kept on this device.", e);
           syncStatus = "offline";
           showOfflineBanner(true);
         }

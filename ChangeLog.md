@@ -3,6 +3,10 @@
 > Every change is recorded here, newest first. Format and rules: [`AI_INSTRUCTIONS.md`](AI_INSTRUCTIONS.md) S4. Plans: [`Roadmap.md`](Roadmap.md).
 > Entries before `Docs — 2026-11-06` are reconstructed from git history (one line each).
 
+## v31.0.3 — 2026-11-08 — Dev1-PendingSaveFix
+- Phase 1-pre (R1 data-loss fix, approved): a save now writes a full copy to the existing offline-queue key BEFORE uploading and removes it only after the server confirms that same snapshot. While that copy exists, `loadState()` (20 s poll, going to Home/Summary, Refresh button) never replaces in-memory data, and on startup the copy becomes the working state. Background retries are silent (no dialogs, never discard); `online` event now also replays after a failed save. Discarding a queued copy in the conflict prompt first keeps a recovery copy (`tindahan-recovery-*`, newest 5). `lastKnownSavedAt` now advances only after a confirmed save (removes false 'Someone else updated' prompts after failures/double-taps). `saveState()` split into `saveState()` + `pushStateToServer()`; uploads a snapshot, not the live `state` object.
+- Files: `index.html` (`saveState`, new `pushStateToServer`, `loadState`, `processOfflineQueue`, `online` listener, 5 small helpers, `APP_VERSION`), `ChangeLog.md` · Data shape touched: no · Requires v31.0.2
+
 ## v31.0.2 — 2026-11-07 — Dev1-MobileHome
 - Phase B (R-3.3, approved): Home on phones now shows Quick Actions first (Today's Entry, GCash Float, Household Budget, Inventory, Insights), then the figures. Data Tools removed from Home Quick Actions only; it stays in the sidebar. Owner Home only. Desktop two-column layout unchanged (reorder applies below 900px).
 - Files: `index.html` (`renderHome()` markup: `home-split` / `home-actions` classes and buttons; one CSS media block after `.split`; `APP_VERSION`), `ChangeLog.md` · Data shape touched: no · Roadmap item: R-3.3 · Requires v31.0.1 (Phase A)
