@@ -458,6 +458,7 @@
         padding: 12px 14px;
         font-size: 14px;
         line-height: 1.4;
+        white-space: pre-line;
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
       }
       .toast.error {
@@ -1557,7 +1558,7 @@
         "Saturday",
       ];
 
-      const APP_VERSION = "v31.0.4"; // bump this by hand with each future commit
+      const APP_VERSION = "v31.0.5"; // bump this by hand with each future commit
       // ---- Design system helpers (v31) -------------------------------------
       // Line icons on a 24px grid. Names only are stored elsewhere (NAV_GROUPS,
       // NOTIF_ICONS) so nothing here can affect saved data.
@@ -3269,6 +3270,7 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
         t.onclick = () => t.remove();
         host.appendChild(t);
         setTimeout(() => t.remove(), severity === "error" ? 9000 : 6000);
+        return t;
       }
 
       let lastDailyCommitAt = 0;
@@ -3313,8 +3315,10 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
           !confirm(
             "All monetary fields are ₱0. Are you sure you want to save this entry?",
           )
-        )
+        ) {
+          notify("Not saved. Your entry is still in the form.");
           return; // form is kept as typed
+        }
 
         if (
           getPrefs().warnDuplicate !== false &&
@@ -3322,8 +3326,10 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
           !confirm(
             `An entry already exists for ${date}. Proceed anyway? This may create a duplicate. Please review existing entries before continuing.`,
           )
-        )
+        ) {
+          notify("Not saved. Your entry is still in the form.");
           return; // form is kept as typed
+        }
 
         // v28.4.0 pot-aware reconstruction: today's pile only lost the expenses paid FROM it,
         // so only those get added back. Reserve/GCash-paid expenses never touched the count.
@@ -3342,21 +3348,29 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
         if (storeClosed) entry.storeClosed = true;
         state.dailyLogs.push(entry);
         lastDailyCommitAt = Date.now();
-        saveState(); // writes the on-device copy synchronously, then syncs in the background
+        const syncing = saveState(); // writes the on-device copy synchronously, then syncs in the background
         const keptOnDevice = hasPendingChanges();
         render();
 
+        const what = storeClosed ? "Store-closed entry saved" : "Entry saved";
+        const zeroLine =
+          zeroNames.length && !storeClosed
+            ? "\n₱0: " + zeroNames.join(", ") + "."
+            : "";
         if (!keptOnDevice) {
           notify(
             "Entry added, but a copy could not be kept on this device. Keep the app open until it syncs.",
             "error",
           );
-        } else if (storeClosed) {
-          notify("Store-closed entry saved on this device.");
-        } else if (zeroNames.length) {
-          notify("Entry saved on this device. ₱0: " + zeroNames.join(", ") + ".");
         } else {
-          notify("Entry saved on this device.");
+          const t = notify(what + " on this device. Waiting to sync." + zeroLine);
+          // Only claim "synced" once the server has actually confirmed it.
+          Promise.resolve(syncing)
+            .then(() => {
+              if (t.isConnected && !hasPendingChanges())
+                t.textContent = what + " and synced." + zeroLine;
+            })
+            .catch(() => {});
         }
         if (getPrefs().zeroDetailPopup && zeroNames.length && !storeClosed) {
           alert("These fields were ₱0:\n- " + zeroNames.join("\n- "));

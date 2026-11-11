@@ -3,6 +3,10 @@
 > Every change is recorded here, newest first. Format and rules: [`AI_INSTRUCTIONS.md`](AI_INSTRUCTIONS.md) S4. Plans: [`Roadmap.md`](Roadmap.md).
 > Entries before `Docs — 2026-11-06` are reconstructed from git history (one line each).
 
+## v31.0.5 — 2026-11-11 — Dev1-DailySafeguards
+- Daily Entry feedback after owner testing: the save toast now reads "Entry saved on this device. Waiting to sync." and changes to "Entry saved and synced." only after the server confirms (stays at "Waiting to sync" offline). Cancelling the all-zero or same-date confirmation now shows "Not saved. Your entry is still in the form." so a cancelled (or browser-blocked) popup is never silent. Toast keeps a second line for the ₱0 fields.
+- Files: `index.html` (`notify`, `addDaily`, toast CSS, `APP_VERSION`), `ChangeLog.md` · Data shape touched: no · Requires v31.0.4
+
 ## v31.0.4 — 2026-11-11 — Dev1-DailySafeguards
 - Phase 1 (approved): Daily Entry safeguards. Empty fields count as ₱0. All-zero entry asks "All monetary fields are ₱0. Are you sure you want to save this entry?" (skipped when Store Closed is ticked). New **Store closed today** checkbox sets the five amounts to 0 (still editable) and stores `storeClosed: true` on the entry; history rows show "Store closed". Any existing entry on the chosen date triggers "An entry already exists for [date]. Proceed anyway? …" (pref `warnDuplicate`, default on). Tap guard: taps within 0.8 s after a save are ignored, so a reset form can no longer log a blank entry. Small reusable `notify()` toast: "Entry saved on this device." plus the list of ₱0 fields; red error toast if the on-device copy could not be written. Read-only mode now refuses Daily saves honestly and keeps the form. New per-device prefs `warnDuplicate` (true) and `zeroDetailPopup` (false); no Settings screen yet (Phase 3).
 - Files: `index.html` (`renderDaily`, `addDaily`, new `notify`/`setDailyClosed`, `getPrefs`, toast CSS, `APP_VERSION`), `ChangeLog.md` · Data shape touched: additive optional `storeClosed` on new entries only · Calculations unchanged · Requires v31.0.3
