@@ -1,0 +1,30 @@
+PASS  newId: UUID v4 shape, 20,000 unique
+PASS  newId: works without crypto.randomUUID (fallback path)
+PASS  fingerprint: key order does not matter, any value change does
+PASS  isLegacy: rows without id are legacy
+PASS  add: applied, retry is skipped, list never gets a duplicate
+PASS  add: same id with different content is a conflict, nothing changes
+PASS  add: creates the list when the category is missing; legacy rows untouched
+PASS  add without an id is refused
+PASS  delete by id: removes only that row; replay finds it missing
+PASS  RESURRECTION GUARD: a late retry of 'add' cannot bring back an entry deleted elsewhere
+PASS  tombstones keep only the newest 200
+PASS  legacy delete among identical rows: removes exactly one; REPLAY never removes a second
+PASS  legacy delete: someone changed the identical-row count -> conflict, no guess
+PASS  legacy undo (re-add): applied once, replay skipped, changed count -> conflict
+PASS  legacy delete of a row that is not in the list is refused when making the op
+PASS  replaceKey: applies when the list is as I last saw it; replay skipped; changed elsewhere -> conflict
+PASS  replaceKey on a list that did not exist yet
+PASS  applyOp never mutates its input (every operation type)
+PASS  ops are immutable snapshots: editing the original record afterwards does not change the queued op
+PASS  unknown operation type is refused
+PASS  revision: legacy has none; next is 1; then +1; other data and keys preserved; input untouched
+PASS  casCondition: 'is null' for legacy, exact revision text otherwise
+PASS  detectOldClientWrite: flags dropped or lower revision
+PASS  rebase: others' entries and my pending entries are both shown; none duplicated
+PASS  rebase: a conflicting pending op is reported and left out, later ops still apply
+PASS  backoff: 2s, 5s, 15s, 60s, then 5 min, within +-20%; attention after 8 tries
+PASS  SIMULATION 4000 runs: 3 phones, lost replies, retries, cross-phone deletes -> nothing lost, duplicated, resurrected or altered
+PASS  SIMULATION 4000 runs: legacy rows with identical copies, repeated sends -> exact counts, never a second delete or add
+
+28 passed, 0 failed
