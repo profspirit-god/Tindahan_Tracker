@@ -3,6 +3,10 @@
 > Every change is recorded here, newest first. Format and rules: [`AI_INSTRUCTIONS.md`](AI_INSTRUCTIONS.md) S4. Plans: [`Roadmap.md`](Roadmap.md).
 > Entries before `Docs — 2026-11-06` are reconstructed from git history (one line each).
 
+## v31.0.6 — 2026-11-12 — Dev1-BackupButton
+- One-tap backup (owner, Home): new "Download backup / I-download ang backup" button at the end of Quick Actions, with a "last backup from this device" line. It downloads the FRESH shared data (not this phone's possibly stale copy); if this phone has unsynced changes or is offline it uses this phone's copy and says so. Filename `tindahan_backup_YYYY-MM-DD_HHMM_vX.json`; toast shows counts (daily entries, GCash logs, items, payables, suki utang) to compare with paper records. READ-ONLY: never writes to the server. Same file shape as "Export full app state", so Data Tools > "Import state from file" restores it (round trip tested). Existing Data Tools exports unchanged. `notify()` accepts an optional duration.
+- Files: `index.html` (`downloadBackup`, `lastBackupText`, Home Quick Actions, `notify`, `APP_VERSION`), `ChangeLog.md` · Data shape touched: no · Requires v31.0.5
+
 ## v31.0.5 — 2026-11-11 — Dev1-DailySafeguards
 - Daily Entry feedback after owner testing: the save toast now reads "Entry saved on this device. Waiting to sync." and changes to "Entry saved and synced." only after the server confirms (stays at "Waiting to sync" offline). Cancelling the all-zero or same-date confirmation now shows "Not saved. Your entry is still in the form." so a cancelled (or browser-blocked) popup is never silent. Toast keeps a second line for the ₱0 fields.
 - Files: `index.html` (`notify`, `addDaily`, toast CSS, `APP_VERSION`), `ChangeLog.md` · Data shape touched: no · Requires v31.0.4

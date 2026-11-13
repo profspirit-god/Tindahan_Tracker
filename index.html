@@ -1558,7 +1558,7 @@
         "Saturday",
       ];
 
-      const APP_VERSION = "v31.0.5"; // bump this by hand with each future commit
+      const APP_VERSION = "v31.0.6"; // bump this by hand with each future commit
       // ---- Design system helpers (v31) -------------------------------------
       // Line icons on a 24px grid. Names only are stored elsewhere (NAV_GROUPS,
       // NOTIF_ICONS) so nothing here can affect saved data.
@@ -2394,6 +2394,51 @@ ${link("gcash", "phone", "GCash Float")}
         alert("Exported full app state. SHA256: " + hash);
       }
 
+      function lastBackupText() {
+        try {
+          const t = localStorage.getItem("tindahan-last-backup");
+          if (!t) return "No backup downloaded from this device yet. Download one before every app update.";
+          return "Last backup from this device: " + new Date(t).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+        } catch (e) {
+          return "";
+        }
+      }
+
+      // One-tap backup. Read-only: it never changes the app data. The file has the same shape as
+      // "Export full app state", so "Import state from file" can restore it.
+      async function downloadBackup() {
+        if (!requireOwner()) return;
+        let data = state;
+        let source = "this device's last loaded data";
+        if (hasPendingChanges()) {
+          source = "this device. It has changes that are not synced yet, so back up again after they sync for a full copy";
+        } else if (navigator.onLine) {
+          try {
+            const { data: row, error } = await sb.from("app_state").select("data").eq("id", 1).single();
+            if (!error && row && row.data) {
+              data = row.data;
+              source = "the shared data (what everyone sees)";
+            }
+          } catch (e) {
+            console.warn("Backup: could not reach the server, using this device's copy.", e);
+          }
+        }
+        const d = new Date();
+        const pad = (n) => String(n).padStart(2, "0");
+        const name = `tindahan_backup_${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}_${APP_VERSION}.json`;
+        downloadFile(name, "application/json;charset=utf-8", JSON.stringify(data, null, 2));
+        try {
+          localStorage.setItem("tindahan-last-backup", d.toISOString());
+        } catch (e) {}
+        const n = (k) => (Array.isArray(data[k]) ? data[k].length : 0);
+        notify(
+          `Backup downloaded: ${name}\nFrom ${source}.\nDaily entries: ${n("dailyLogs")} · GCash logs: ${n("gcashLogs")} · Items: ${n("inventory")} · Payables: ${n("payables")} · Suki utang: ${n("receivables")}`,
+          undefined,
+          12000,
+        );
+        render();
+      }
+
       async function exportRows(table) {
         if (!state[table]) {
           alert("No such table: " + table);
@@ -2778,6 +2823,8 @@ ${header("Store Health", "Kalusugan ng Tindahan (Staff view)")}
 <button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="go('household')">Household Budget</button>
 <button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="go('inventory')">Inventory</button>
 <button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="go('insights')">Insights</button>
+<button class="btn" style="width:100%; margin-top:18px; background:transparent; border:1.5px dashed var(--ink-soft); color:var(--ink);" onclick="downloadBackup()">Download backup / I-download ang backup</button>
+<div style="text-align:center; font-size:12px; color:var(--ink-soft); margin-top:8px;">${lastBackupText()}</div>
     </div></div>
   </main>`;
       }
@@ -3255,7 +3302,7 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
   </main>`;
       }
       // Small reusable toast (Phase 3 will extend this). Never claims a server result.
-      function notify(text, severity) {
+      function notify(text, severity, ms) {
         let host = document.getElementById("toast-host");
         if (!host) {
           host = document.createElement("div");
@@ -3269,7 +3316,7 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
         t.textContent = text;
         t.onclick = () => t.remove();
         host.appendChild(t);
-        setTimeout(() => t.remove(), severity === "error" ? 9000 : 6000);
+        setTimeout(() => t.remove(), ms || (severity === "error" ? 9000 : 6000));
         return t;
       }
 
