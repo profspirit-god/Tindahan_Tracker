@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tindahan trigger test (TEST table only)</title>
+<style>
+ body{font-family:system-ui,sans-serif;max-width:640px;margin:24px auto;padding:0 14px;line-height:1.45}
+ input[type=text],input[type=password]{width:100%;padding:10px;margin:4px 0 12px;box-sizing:border-box;font-size:16px}
+ button{padding:12px 18px;font-size:16px;margin-right:8px}
+ pre{background:#f2f2f2;padding:12px;white-space:pre-wrap;word-break:break-word}
+ .warn{background:#fbeae8;padding:10px;border-radius:8px}
+</style></head><body>
+<h1>Trigger test</h1>
+<p class="warn"><b>Run this only after creating the TEST table</b> with <code>trigger_setup_TEST_table.sql</code>.
+It works on table <code>app_state_trigger_test</code>, row id 999 only, and refuses to run on <code>app_state</code>.
+Use the public anon/publishable key, never a service-role key or password.</p>
+<label>Project URL<input type="text" id="url" placeholder="https://xxxx.supabase.co"></label>
+<label>Anon (public) key<input type="password" id="key"></label>
+<label>Test table name<input type="text" id="table" value="app_state_trigger_test"></label>
+<label><input type="checkbox" id="ok"> I understand this only touches row id 999 of the TEST table</label><br><br>
+<button id="run">Run test</button><button id="copy" disabled>Copy results (wait for Finished)</button>
+<pre id="out">Results appear here.</pre>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+<script>
+const ROW = 999, lines = [], out = document.getElementById("out");
+let t0 = Date.now();
+const log = (name, ok, detail) => { lines.push((ok ? "PASS  " : "FAIL  ") + name + (detail ? "  [" + detail + "]" : "") + "  (" + (Date.now() - t0) + " ms)"); t0 = Date.now(); out.textContent = lines.join("\n"); };
+// Some preview panels forward fetch() between frames and cannot copy Headers/AbortSignal objects.
+const plainFetch = (input, init) => {
+  init = Object.assign({}, init || {});
+  if (init.headers && typeof init.headers.forEach === "function" && !Array.isArray(init.headers)) {
+    const h = {}; init.headers.forEach((v, k) => { h[k] = v; }); init.headers = h;
+  }
+  delete init.signal;
+  return fetch(input, init);
+};
+// Accepts https://xxxx.supabase.co with stray "/", "/rest/v1", spaces. Returns {url, problem}.
+function cleanUrl(raw) {
+  let u = String(raw || "").trim();
+  if (!/^https?:\/\//i.test(u)) return { url: u, problem: "The URL must start with https:// (use the Project URL, e.g. https://abcd1234.supabase.co)." };
+  if (/supabase\.com\/dashboard/i.test(u)) return { url: u, problem: "That is the dashboard address. Use Project Settings > API > Project URL (https://<ref>.supabase.co)." };
+  u = u.replace(/\/rest\/v1.*$/i, "").replace(/\/+$/, "");
+  return { url: u, problem: null };
+}
+const rev = (n) => ({ items: ["v" + n], _meta: { revision: n } });
+const withTimeout = (label, p, ms = 20000) => Promise.race([
+  Promise.resolve(p),
+  new Promise((_, rej) => setTimeout(() => rej(new Error('no answer after ' + ms / 1000 + ' s (' + label + ')')), ms)),
+]);
+const progress = (label) => { t0 = Date.now(); out.textContent = "RUNNING - please wait, do not copy yet...\n\n" + lines.join("\n") + "\n... " + label; };
+
+const isConflict = (r) => !!(r.error && /revision conflict/i.test(r.error.message || ""));
+async function run() {
+  const cb = document.getElementById("copy"); cb.disabled = true; cb.textContent = "Copy results (wait for Finished)";
+  lines.length = 0; out.textContent = "RUNNING - please wait, do not copy yet...";
+  if (!document.getElementById("ok").checked) { out.textContent = "Tick the checkbox first."; return; }
+  const table = document.getElementById("table").value.trim();
+  if (!table || table === "app_state") { out.textContent = "Enter the TEST table name. This page refuses to run on app_state."; return; }
+  const cu = cleanUrl(document.getElementById("url").value);
+  if (cu.problem) { out.textContent = cu.problem; return; }
+  const key = document.getElementById("key").value.trim();
+  if (!key) { out.textContent = "Paste the anon (public) key first."; return; }
+  const sb = supabase.createClient(cu.url, key, { global: { fetch: plainFetch } });
+  lines.push("Environment: protocol=" + location.protocol + " keyLength=" + key.length + " table=" + table + "\n");
+  const T = () => sb.from(table);
+  let created = false;
+  try {
+    progress("A: reaching the test table");
+    const g = await withTimeout("probe", T().select("id").limit(1));
+    log("A reach the test table", !g.error, g.error ? g.error.message + " (did you run trigger_setup_TEST_table.sql?)" : "ok");
+    if (g.error) return;
+
+    progress("0: creating test row 999");
+    await withTimeout("delete", T().delete().eq("id", ROW));
+    let r = await withTimeout("insert", T().insert({ id: ROW, data: { items: [], _meta: {} } }));
+    log("0 insert test row 999 (no revision, like your current data)", !r.error, r.error && r.error.message);
+    if (r.error) return;
+    created = true;
+
+    const upd = (data, filterRev) => { let q = T().update({ data }).eq("id", ROW); if (filterRev !== undefined) q = q.eq("data->_meta->>revision", String(filterRev)); return q.select("id"); };
+
+    r = await withTimeout("1", upd(rev(1)));
+    log("1 first write revision 1 (no filter) -> accepted", !r.error && r.data && r.data.length === 1, r.error ? r.error.message : "rows=" + (r.data || []).length);
+    r = await withTimeout("2", upd(rev(2)));
+    log("2 next write revision 2 -> accepted", !r.error && r.data && r.data.length === 1, r.error ? r.error.message : "rows=" + (r.data || []).length);
+    r = await withTimeout("3", upd({ items: ["old-app"], _meta: { lastSavedAt: "x", lastSavedBy: "old" } }));
+    log("3 OLD-APP style write (no revision) -> REJECTED by trigger", isConflict(r), r.error ? r.error.message.slice(0, 90) : "NOT rejected, rows=" + (r.data || []).length);
+    r = await withTimeout("4", upd(rev(5)));
+    log("4 skipped revision (5 while current is 2) -> REJECTED", isConflict(r), r.error ? r.error.message.slice(0, 90) : "NOT rejected");
+    r = await withTimeout("5", upd(rev(2)));
+    log("5 replayed revision (2 while current is 2) -> REJECTED", isConflict(r), r.error ? r.error.message.slice(0, 90) : "NOT rejected");
+
+    progress("6: two racing writers without any filter");
+    const [a, b] = await withTimeout("race", Promise.all([upd({ items: ["A"], _meta: { revision: 3 } }), upd({ items: ["B"], _meta: { revision: 3 } })]));
+    const okA = !a.error && a.data && a.data.length === 1, okB = !b.error && b.data && b.data.length === 1;
+    log("6 two RACING unfiltered writers (both revision 3) -> exactly 1 accepted, 1 rejected", (okA !== okB) && (okA ? isConflict(b) : isConflict(a)), "A=" + (okA ? "accepted" : "rejected") + " B=" + (okB ? "accepted" : "rejected"));
+
+    r = await withTimeout("7", T().select("data").eq("id", ROW).single());
+    const d = r.data && r.data.data;
+    log("7 read back: revision is 3", !r.error && d && d._meta.revision === 3, d ? "revision=" + d._meta.revision + " items=" + JSON.stringify(d.items) : (r.error && r.error.message));
+
+    r = await withTimeout("8", upd(rev(4), 3));
+    log("8 write with the client-side filter too (revision 3 -> 4) -> accepted", !r.error && r.data && r.data.length === 1, r.error ? r.error.message : "rows=" + (r.data || []).length);
+    r = await withTimeout("9", upd(rev(5), 3));
+    log("9 filtered write with a stale revision -> 0 rows, no error (filter still works)", !r.error && r.data && r.data.length === 0, r.error ? r.error.message : "rows=" + (r.data || []).length);
+  } catch (e) { log("unexpected error", false, String(e && e.message || e)); }
+  finally {
+    if (created) { try { const c = await withTimeout("cleanup", T().delete().eq("id", ROW)); log("cleanup: test row 999 deleted", !c.error, c.error && c.error.message); } catch (e) { log("cleanup", false, String(e.message || e)); } }
+    lines.push("\nFINISHED. Send me this text (it contains no keys)."); out.textContent = lines.join("\n");
+    const cb2 = document.getElementById("copy"); cb2.disabled = false; cb2.textContent = "Copy results";
+  }
+}
+document.getElementById("run").onclick = run;
+document.getElementById("copy").onclick = () => navigator.clipboard.writeText(out.textContent);
+</script></body></html>
