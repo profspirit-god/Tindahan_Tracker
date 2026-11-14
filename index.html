@@ -133,7 +133,7 @@
         z-index: 5;
         background: var(--page);
         color: var(--ink);
-        padding: 14px 124px 12px 68px;
+        padding: 14px 68px 12px 68px;
         min-height: 68px;
         display: flex;
         align-items: center;
@@ -151,6 +151,24 @@
         font-size: 13.5px;
         color: var(--ink-soft);
         font-weight: 400;
+      }
+      /* phones: the undo button (left of the bell) only takes space while visible */
+      @media (max-width: 899px) {
+        body.has-undo header.top {
+          padding-right: 124px;
+        }
+      }
+      /* narrow phones (320-430px): slightly smaller title, tighter subtitle */
+      @media (max-width: 430px) {
+        header.top h1 {
+          font-size: 20px;
+          text-wrap: balance;
+        }
+        header.top p {
+          font-size: 13px;
+          line-height: 1.3;
+          text-wrap: balance;
+        }
       }
       main {
         padding: 20px 20px 12px;
@@ -419,6 +437,33 @@
         padding: 16px;
         margin-bottom: 14px;
         box-shadow: none;
+      }
+      #toast-host {
+        position: fixed;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: min(92vw, 420px);
+        pointer-events: none;
+      }
+      .toast {
+        pointer-events: auto;
+        background: var(--ink);
+        color: var(--page);
+        border-radius: var(--radius-sm);
+        padding: 12px 14px;
+        font-size: 14px;
+        line-height: 1.4;
+        white-space: pre-line;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+      }
+      .toast.error {
+        background: var(--bad-solid);
+        color: #fff;
       }
       .banner {
         font-size: 13.5px;
@@ -997,6 +1042,17 @@
       .split {
         display: block;
       }
+      /* Home on phones: Quick Actions first, figures below (desktop grid unchanged) */
+      @media (max-width: 899px) {
+        .split.home-split {
+          display: flex;
+          flex-direction: column;
+        }
+        .split.home-split > .home-actions {
+          order: -1;
+          margin-bottom: 8px;
+        }
+      }
       @media (min-width: 900px) {
         #app,
         #app-shell {
@@ -1502,7 +1558,7 @@
         "Saturday",
       ];
 
-      const APP_VERSION = "v31.0.0"; // bump this by hand with each future commit
+      const APP_VERSION = "v31.0.7"; // bump this by hand with each future commit
       // ---- Design system helpers (v31) -------------------------------------
       // Line icons on a 24px grid. Names only are stored elsewhere (NAV_GROUPS,
       // NOTIF_ICONS) so nothing here can affect saved data.
@@ -2025,10 +2081,474 @@ ${link("gcash", "phone", "GCash Float")}
         if (banner) banner.style.display = show ? "block" : "none";
       }
 
+      // ---- Pending-change protection (v31.0.3, fixes R1 data loss) ----
+      // The queue key holds a write-ahead copy of the whole state from the moment a save starts
+      // until the server confirms that same snapshot. While it exists, this device has changes the
+      // server has not acknowledged, so nothing may replace the in-memory state or clear the key.
+      let saveSeq = 0;
+      let savesInFlight = 0;
+      let lastSaveStartedAt = 0;
+      let processingQueue = false;
+      function hasPendingChanges() {
+        return !!localStorage.getItem(OFFLINE_QUEUE_KEY);
+      }
+      function saveBusy() {
+        // a save running over 60 s is treated as stuck so retries are never blocked forever
+        return savesInFlight > 0 && Date.now() - lastSaveStartedAt < 60000;
+      }
+      async function waitForQueueIdle() {
+        const start = Date.now();
+        while (processingQueue && Date.now() - start < 60000) {
+          await new Promise((r) => setTimeout(r, 50));
+        }
+      }
+      function stashRecoveryCopy(raw) {
+        try {
+          const key =
+            "tindahan-recovery-" + new Date().toISOString().replace(/[:.]/g, "-");
+          localStorage.setItem(key, raw);
+          const keys = Object.keys(localStorage)
+            .filter((k) => k.indexOf("tindahan-recovery-") === 0)
+            .sort();
+          while (keys.length > 5) localStorage.removeItem(keys.shift());
+        } catch (e) {
+          console.warn("Could not store recovery copy", e);
+        }
+      }
+
+      // ==== SYNC-CORE BEGIN (pure logic, tested in sync-core/sync_core_tests.js) ====
+      const SyncCore = (function () {
+        "use strict";
+      const TOMBSTONE_LIMIT = 200; // recent deletions remembered in _meta.deleted
+      const BACKOFF_STEPS = [2000, 5000, 15000, 60000, 300000];
+      const ATTENTION_AFTER = 8;
+
+      function deepClone(v) {
+        return v === undefined ? undefined : JSON.parse(JSON.stringify(v));
+      }
+      function nowIso() {
+        return new Date().toISOString();
+      }
+
+      // ---- ids -------------------------------------------------------------------------------
+      function newId(cryptoObj) {
+        const c = cryptoObj || (typeof crypto !== "undefined" ? crypto : null);
+        if (c && typeof c.randomUUID === "function") return c.randomUUID();
+        const b = new Uint8Array(16);
+        if (c && typeof c.getRandomValues === "function") c.getRandomValues(b);
+        else for (let i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
+        b[6] = (b[6] & 0x0f) | 0x40;
+        b[8] = (b[8] & 0x3f) | 0x80;
+        const h = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+        return [h.slice(0, 8), h.slice(8, 12), h.slice(12, 16), h.slice(16, 20), h.slice(20)].join("-");
+      }
+
+      // ---- fingerprints (legacy rows have no id) ----------------------------------------------
+      // The fingerprint is the exact canonical text of the row (keys sorted), not a hash, so two
+      // different rows can never be mistaken for each other.
+      function canonicalJson(v) {
+        if (v === null || typeof v !== "object") return JSON.stringify(v === undefined ? null : v);
+        if (Array.isArray(v)) return "[" + v.map(canonicalJson).join(",") + "]";
+        const keys = Object.keys(v).filter((k) => v[k] !== undefined).sort();
+        return "{" + keys.map((k) => JSON.stringify(k) + ":" + canonicalJson(v[k])).join(",") + "}";
+      }
+      const fingerprint = canonicalJson;
+
+      // Short hash, used only to notice that a whole list changed (replace-list operations).
+      function hashString(str) {
+        let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+        for (let i = 0; i < str.length; i++) {
+          const ch = str.charCodeAt(i);
+          h1 = Math.imul(h1 ^ ch, 2654435761);
+          h2 = Math.imul(h2 ^ ch, 1597334677);
+        }
+        h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+        h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+        return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16) + ":" + str.length;
+      }
+
+      function countMatching(list, fp) {
+        return (list || []).filter((r) => fingerprint(r) === fp).length;
+      }
+      const isLegacy = (record) => !record || record.id === undefined || record.id === null;
+
+      // ---- operations -------------------------------------------------------------------------
+      function makeAddOp(category, record, now) {
+        if (isLegacy(record)) throw new Error("add needs a record with an id");
+        return { opId: newId(), type: "add", category, record: deepClone(record), createdAt: now || nowIso() };
+      }
+      function makeDeleteByIdOp(category, id, now) {
+        if (!id) throw new Error("delete needs an id");
+        return { opId: newId(), type: "delete", category, id, createdAt: now || nowIso() };
+      }
+      // `list` = the list as the user saw it when they acted.
+      function makeDeleteLegacyOp(category, list, record, now) {
+        const fp = fingerprint(record);
+        const count = countMatching(list, fp);
+        if (count < 1) throw new Error("row not found in the list");
+        return { opId: newId(), type: "deleteLegacy", category, fp, expectCount: count, createdAt: now || nowIso() };
+      }
+      function makeAddLegacyOp(category, list, record, now) {
+        const fp = fingerprint(record);
+        return { opId: newId(), type: "addLegacy", category, record: deepClone(record), fp, expectCount: countMatching(list, fp), createdAt: now || nowIso() };
+      }
+      function makeReplaceKeyOp(category, baseValue, newValue, now) {
+        const base = baseValue === undefined ? [] : baseValue;
+        return { opId: newId(), type: "replaceKey", category, baseHash: hashString(canonicalJson(base)), value: deepClone(newValue), createdAt: now || nowIso() };
+      }
+
+      // ---- applying an operation to a COPY of the shared data ----------------------------------
+      function addTombstone(blob, id, at) {
+        blob._meta = blob._meta && typeof blob._meta === "object" ? blob._meta : {};
+        const d = Array.isArray(blob._meta.deleted) ? blob._meta.deleted : [];
+        d.push({ id, at });
+        blob._meta.deleted = d.slice(-TOMBSTONE_LIMIT);
+      }
+      function isTombstoned(blob, id) {
+        const d = blob._meta && blob._meta.deleted;
+        return Array.isArray(d) && d.some((t) => t.id === id);
+      }
+
+      /*
+       * Returns { blob, result, reason }. `blob` is always a fresh copy (unchanged when nothing applied).
+       * result: "applied" | "skipped-already-applied" | "skipped-target-missing" | "skipped-deleted" | "conflict"
+       */
+      function applyOp(blob, op) {
+        const out = deepClone(blob) || {};
+        const done = (result, reason) => ({ blob: out, result, reason: reason || "" });
+        const cat = op.category;
+        if (op.type === "replaceKey") {
+          const cur = out[cat] === undefined ? [] : out[cat];
+          const curHash = hashString(canonicalJson(cur));
+          if (curHash === op.baseHash) { out[cat] = deepClone(op.value); return done("applied"); }
+          if (curHash === hashString(canonicalJson(op.value))) return done("skipped-already-applied");
+          return done("conflict", "list changed elsewhere");
+        }
+        if (out[cat] !== undefined && !Array.isArray(out[cat])) return done("conflict", "not a list");
+        const list = out[cat] || (out[cat] = []);
+
+        switch (op.type) {
+          case "add": {
+            const existing = list.find((r) => r && r.id === op.record.id);
+            if (existing) {
+              return canonicalJson(existing) === canonicalJson(op.record)
+                ? done("skipped-already-applied")
+                : done("conflict", "same id, different content");
+            }
+            if (isTombstoned(out, op.record.id)) return done("skipped-deleted", "deleted elsewhere before it synced");
+            list.push(deepClone(op.record));
+            return done("applied");
+          }
+          case "delete": {
+            const idx = list.findIndex((r) => r && r.id === op.id);
+            if (idx < 0) return done("skipped-target-missing");
+            list.splice(idx, 1);
+            addTombstone(out, op.id, op.createdAt);
+            return done("applied");
+          }
+          case "deleteLegacy": {
+            const count = countMatching(list, op.fp);
+            if (count === op.expectCount) {
+              list.splice(list.findIndex((r) => fingerprint(r) === op.fp), 1);
+              return done("applied");
+            }
+            if (count === op.expectCount - 1) return done("skipped-already-applied");
+            return done("conflict", "identical-row count changed elsewhere");
+          }
+          case "addLegacy": {
+            const count = countMatching(list, op.fp);
+            if (count === op.expectCount) { list.push(deepClone(op.record)); return done("applied"); }
+            if (count === op.expectCount + 1) return done("skipped-already-applied");
+            return done("conflict", "identical-row count changed elsewhere");
+          }
+          default:
+            throw new Error("unknown operation type: " + op.type);
+        }
+      }
+
+      // "Server data + my pending operations": what the screen should show. Operations that
+      // conflict are left out of the view and reported, never silently forced in.
+      function rebase(serverBlob, pendingOps) {
+        let blob = deepClone(serverBlob) || {};
+        const results = [];
+        for (const op of pendingOps) {
+          const r = applyOp(blob, op);
+          blob = r.blob;
+          results.push({ opId: op.opId, result: r.result, reason: r.reason });
+        }
+        return { blob, results };
+      }
+
+      // ---- revision (compare-and-swap) -----------------------------------------------------------
+      function getRevision(blob) {
+        const r = blob && blob._meta && blob._meta.revision;
+        return Number.isInteger(r) && r >= 0 ? r : null;
+      }
+      // The data to write: same content, revision + 1. `blob` is what we last read from the server.
+      function nextBlob(blob, now, user) {
+        const out = deepClone(blob) || {};
+        const rev = getRevision(out);
+        out._meta = Object.assign({}, out._meta, { lastSavedAt: now, lastSavedBy: user, revision: (rev === null ? 0 : rev) + 1 });
+        return out;
+      }
+      // How the update must be conditioned: legacy rows without a revision use "is null".
+      function casCondition(readBlob) {
+        const r = getRevision(readBlob);
+        return r === null ? { mode: "is-null" } : { mode: "eq", value: String(r) };
+      }
+      // Spot writes made by older app versions (they replace _meta and drop the revision).
+      function detectOldClientWrite(expectedRevision, serverBlob) {
+        if (expectedRevision === null || expectedRevision === undefined) return "ok";
+        const sr = getRevision(serverBlob);
+        if (sr === null) return "revision-missing";
+        if (sr < expectedRevision) return "revision-regressed";
+        return "ok";
+      }
+
+      // ---- retry schedule ------------------------------------------------------------------------
+      function backoffMs(attempt, rand) {
+        const r = rand || Math.random;
+        const base = BACKOFF_STEPS[Math.min(Math.max(attempt, 1), BACKOFF_STEPS.length) - 1];
+        return Math.round(base * (0.8 + 0.4 * r()));
+      }
+      const needsAttention = (attempts) => attempts >= ATTENTION_AFTER;
+        return { TOMBSTONE_LIMIT, deepClone, newId, canonicalJson, fingerprint, hashString, countMatching, isLegacy, makeAddOp, makeDeleteByIdOp, makeDeleteLegacyOp, makeAddLegacyOp, makeReplaceKeyOp, applyOp, rebase, getRevision, nextBlob, casCondition, detectOldClientWrite, backoffMs, needsAttention };
+      })();
+      // ==== SYNC-CORE END ====
+
+      // ---- On-device store (Phase 2c). Used ONLY when this device's "local-first" switch is on. ----
+      // One IndexedDB transaction writes the entry and its sync instruction together: both or neither.
+      const LocalStore = (function () {
+        const DB_NAME = "tindahan-local";
+        let dbPromise = null;
+        const unavailable = (msg) => {
+          const e = new Error(msg);
+          e.unavailable = true;
+          return e;
+        };
+        function open() {
+          if (dbPromise) return dbPromise;
+          dbPromise = new Promise((resolve, reject) => {
+            if (typeof indexedDB === "undefined") return reject(unavailable("IndexedDB not available"));
+            let req;
+            try {
+              req = indexedDB.open(DB_NAME, 1);
+            } catch (e) {
+              return reject(unavailable(String(e && e.message)));
+            }
+            req.onupgradeneeded = () => {
+              const db = req.result;
+              db.createObjectStore("records", { keyPath: "id" });
+              db.createObjectStore("outbox", { keyPath: "opId" });
+              db.createObjectStore("meta", { keyPath: "key" });
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(unavailable("IndexedDB open failed"));
+            req.onblocked = () => reject(unavailable("IndexedDB blocked"));
+          });
+          dbPromise.catch(() => {
+            dbPromise = null; // allow a later retry
+          });
+          return dbPromise;
+        }
+        function run(stores, mode, fn) {
+          return open().then(
+            (db) =>
+              new Promise((resolve, reject) => {
+                let result;
+                let t;
+                try {
+                  t = db.transaction(stores, mode, { durability: "strict" });
+                } catch (e) {
+                  return reject(e);
+                }
+                t.oncomplete = () => resolve(result);
+                t.onerror = () => reject(t.error || new Error("transaction error"));
+                t.onabort = () => reject(t.error || new Error("transaction aborted"));
+                try {
+                  result = fn(t);
+                } catch (e) {
+                  try {
+                    t.abort();
+                  } catch (_) {}
+                  reject(e);
+                }
+              }),
+          );
+        }
+        const all = (store) => (t) => {
+          const box = { rows: [] };
+          const rq = t.objectStore(store).getAll();
+          rq.onsuccess = () => {
+            box.rows = rq.result;
+          };
+          return box;
+        };
+        return {
+          // Atomic: the record and its "add" operation are saved together, or not at all.
+          async commitAdd(category, record) {
+            const op = SyncCore.makeAddOp(category, record);
+            await run(["records", "outbox"], "readwrite", (t) => {
+              t.objectStore("records").put({ id: record.id, category, record: SyncCore.deepClone(record), status: "waiting", createdAt: record.createdAt });
+              t.objectStore("outbox").put(Object.assign({}, op, { status: "waiting", attempts: 0 }));
+            });
+            return op;
+          },
+          markSynced(opId, recordId) {
+            return run(["records", "outbox"], "readwrite", (t) => {
+              t.objectStore("outbox").delete(opId);
+              const rs = t.objectStore("records");
+              const g = rs.get(recordId);
+              g.onsuccess = () => {
+                if (g.result) {
+                  g.result.status = "synced";
+                  rs.put(g.result);
+                }
+              };
+            });
+          },
+          // Entry deleted on purpose: never offer it for restore.
+          markDeleted(recordId) {
+            return run(["records", "outbox"], "readwrite", (t) => {
+              const rs = t.objectStore("records");
+              const g = rs.get(recordId);
+              g.onsuccess = () => {
+                if (g.result) {
+                  g.result.status = "deleted";
+                  rs.put(g.result);
+                }
+              };
+              const ob = t.objectStore("outbox");
+              const rq = ob.getAll();
+              rq.onsuccess = () =>
+                rq.result.forEach((op) => {
+                  if (op.record && op.record.id === recordId) ob.delete(op.opId);
+                });
+            });
+          },
+          dismiss(opId) {
+            return run(["outbox"], "readwrite", (t) => {
+              const ob = t.objectStore("outbox");
+              const g = ob.get(opId);
+              g.onsuccess = () => {
+                if (g.result) {
+                  g.result.status = "dismissed";
+                  ob.put(g.result);
+                }
+              };
+            });
+          },
+          async listWaiting() {
+            let box;
+            await run(["outbox"], "readonly", (t) => (box = all("outbox")(t)));
+            return box.rows.filter((o) => o.status === "waiting");
+          },
+          async countRecords() {
+            let box;
+            await run(["records"], "readonly", (t) => (box = all("records")(t)));
+            return box.rows.length;
+          },
+          async probe() {
+            try {
+              await run(["meta"], "readwrite", (t) => {
+                t.objectStore("meta").put({ key: "probe", at: Date.now() });
+              });
+              return true;
+            } catch (e) {
+              return false;
+            }
+          },
+        };
+      })();
+
+      const localFirstOn = () => getPrefs().localFirst === true;
+
+      async function setLocalFirst(on) {
+        if (on) {
+          const ok = await LocalStore.probe();
+          if (!ok) {
+            const p = getPrefs();
+            p.localFirst = false;
+            savePrefs(p);
+            notify("This browser cannot use on-device storage, so the switch stays OFF.", "error");
+            render();
+            return;
+          }
+          try {
+            if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+          } catch (e) {}
+        }
+        const p = getPrefs();
+        p.localFirst = !!on;
+        savePrefs(p);
+        notify(on ? "On-device saving is ON for this device only." : "On-device saving is OFF for this device.");
+      }
+
+      async function showLocalStatus() {
+        try {
+          const waiting = await LocalStore.listWaiting();
+          const total = await LocalStore.countRecords();
+          notify(`On-device storage works. Waiting to sync: ${waiting.length}. Entries kept on this device: ${total}.`, undefined, 9000);
+        } catch (e) {
+          notify("On-device storage is not available in this browser.", "error");
+        }
+      }
+
+      // Everything in memory is confirmed on the server (nothing pending): mark the matching on-device
+      // entries as synced. Never changes the shared data.
+      async function markConfirmedOps() {
+        if (!localFirstOn() || hasPendingChanges()) return;
+        const waiting = await LocalStore.listWaiting();
+        for (const op of waiting) {
+          const list = Array.isArray(state[op.category]) ? state[op.category] : [];
+          if (list.some((r) => r && r.id === op.record.id)) await LocalStore.markSynced(op.opId, op.record.id);
+        }
+      }
+
+      // At startup (switch on, data freshly loaded, nothing pending): entries saved on this device that
+      // are missing from the shared data are NEVER restored automatically. The owner is asked.
+      async function reconcileLocalStore() {
+        if (!localFirstOn() || !loaded || hasPendingChanges() || saveBusy() || syncStatus !== "ok") return;
+        let waiting;
+        try {
+          waiting = await LocalStore.listWaiting();
+        } catch (e) {
+          return;
+        }
+        const missing = [];
+        for (const op of waiting) {
+          const list = Array.isArray(state[op.category]) ? state[op.category] : [];
+          if (list.some((r) => r && r.id === op.record.id)) {
+            await LocalStore.markSynced(op.opId, op.record.id).catch(() => {});
+          } else {
+            missing.push(op);
+          }
+        }
+        if (!missing.length) return;
+        const lines = missing.map((o) => `- ${o.record.date}: ending cash ₱${o.record.enteredEndingCash || 0}`).join("\n");
+        const ok = confirm(
+          `${missing.length} ${missing.length === 1 ? "entry" : "entries"} saved on this device ${missing.length === 1 ? "is" : "are"} not in the shared data:\n${lines}\n\nRestore ${missing.length === 1 ? "it" : "them"} now?`,
+        );
+        if (!ok) {
+          for (const op of missing) await LocalStore.dismiss(op.opId).catch(() => {});
+          return;
+        }
+        for (const op of missing) {
+          const r = SyncCore.applyOp(state, op);
+          if (r.result === "applied") state[op.category] = r.blob[op.category];
+        }
+        await saveState();
+        if (!hasPendingChanges()) {
+          for (const op of missing) await LocalStore.markSynced(op.opId, op.record.id).catch(() => {});
+        }
+        render();
+        notify(`Restored ${missing.length} ${missing.length === 1 ? "entry" : "entries"} from this device.`);
+      }
+
       window.addEventListener("online", () => {
-        if (isOfflineMode) {
+        if (isOfflineMode || hasPendingChanges()) {
           isOfflineMode = false;
-          showOfflineBanner(false);
+          showOfflineBanner(hasPendingChanges());
           processOfflineQueue();
         }
       });
@@ -2038,27 +2558,38 @@ ${link("gcash", "phone", "GCash Float")}
         showOfflineBanner(true);
       });
 
-      async function processOfflineQueue() {
+      // interactive = true: startup / reconnect (may ask the owner to decide a conflict).
+      // interactive = false: background retries (never show a dialog, never discard anything).
+      async function processOfflineQueue(interactive = true) {
+        if (processingQueue || saveBusy()) return;
         const queued = localStorage.getItem(OFFLINE_QUEUE_KEY);
         if (!queued) return;
-
+        processingQueue = true;
         try {
           const pendingState = JSON.parse(queued);
-          // Basic conflict check: if server has newer data, warn user
-          const { data: current } = await sb
+          const { data: current, error: readError } = await sb
             .from("app_state")
             .select("data")
             .eq("id", 1)
             .single();
+          if (readError) throw readError;
           const serverSavedAt = current?.data?._meta?.lastSavedAt;
           const queueSavedAt = pendingState._meta?.lastSavedAt;
 
           if (serverSavedAt && queueSavedAt && serverSavedAt > queueSavedAt) {
+            if (!interactive) {
+              syncStatus = "conflict";
+              showOfflineBanner(true);
+              return;
+            }
             const proceed = confirm(
-              "Data conflict!\n\nSomeone updated the data online while this device was offline.\n\nOK = Overwrite server with this device's offline changes.\nCancel = Discard offline changes and fetch server data.",
+              "Data conflict!\n\nSomeone updated the data online while this device was offline.\n\nOK = Overwrite server with this device's offline changes.\nCancel = Discard offline changes and fetch server data. A recovery copy stays on this device.",
             );
             if (!proceed) {
-              localStorage.removeItem(OFFLINE_QUEUE_KEY);
+              stashRecoveryCopy(queued);
+              if (localStorage.getItem(OFFLINE_QUEUE_KEY) === queued)
+                localStorage.removeItem(OFFLINE_QUEUE_KEY);
+              showOfflineBanner(false);
               await quickRefresh();
               return;
             }
@@ -2072,18 +2603,22 @@ ${link("gcash", "phone", "GCash Float")}
             .from("app_state")
             .update({ data: pendingState })
             .eq("id", 1);
-          if (!error) {
+          if (error) throw error;
+          if (!lastKnownSavedAt || now > lastKnownSavedAt) lastKnownSavedAt = now;
+          // Clear only if nothing newer was queued while this request was running.
+          if (localStorage.getItem(OFFLINE_QUEUE_KEY) === queued) {
             localStorage.removeItem(OFFLINE_QUEUE_KEY);
             state = pendingState;
-            lastKnownSavedAt = now;
             syncStatus = "ok";
+            showOfflineBanner(false);
             render();
-            console.log("Offline queue successfully synced.");
-          } else {
-            console.error("Failed to sync offline queue", error);
           }
         } catch (e) {
           console.error("Error processing offline queue", e);
+          syncStatus = "offline";
+          showOfflineBanner(true);
+        } finally {
+          processingQueue = false;
         }
       }
 
@@ -2118,25 +2653,39 @@ ${link("gcash", "phone", "GCash Float")}
       }
 
       async function loadState() {
-        // If offline and we have a queue, use the queue so the app still works!
-        if (!navigator.onLine && localStorage.getItem(OFFLINE_QUEUE_KEY)) {
+        // R1: never replace local state that holds changes the server has not confirmed.
+        let pendingRaw = localStorage.getItem(OFFLINE_QUEUE_KEY);
+        if (pendingRaw && !loaded) {
+          // first load of this session: the pending copy is the working state
           try {
-            state = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY));
-            syncStatus = "offline";
-            showOfflineBanner(true);
-            loaded = true;
-            return;
+            state = JSON.parse(pendingRaw);
           } catch (e) {
             console.warn("Failed to parse offline queue", e);
+            stashRecoveryCopy(pendingRaw);
+            localStorage.removeItem(OFFLINE_QUEUE_KEY);
+            pendingRaw = null;
           }
         }
+        if (pendingRaw) {
+          if (syncStatus !== "conflict") syncStatus = "offline";
+          showOfflineBanner(true);
+          loaded = true;
+          // quiet background retry: no dialogs, never discards anything
+          if (navigator.onLine && !isOfflineMode && syncStatus !== "conflict") {
+            processOfflineQueue(false);
+          }
+          return;
+        }
 
+        const seqAtStart = saveSeq;
         try {
           const { data, error } = await sb
             .from("app_state")
             .select("data")
             .eq("id", 1)
             .single();
+          // A save started while this request was running: the server copy is already stale.
+          if (loaded && (saveSeq !== seqAtStart || hasPendingChanges())) return;
           if (!error && data.data) {
             state = Object.assign(state, data.data);
             if (!state.household || state.household.length === 0) {
@@ -2166,15 +2715,34 @@ ${link("gcash", "phone", "GCash Float")}
         const now = new Date().toISOString();
         state._meta = { lastSavedAt: now, lastSavedBy: currentUser };
 
-        // If offline, save to queue immediately
+        // Write-ahead: keep a durable full copy until the server confirms exactly this snapshot.
+        const snap = JSON.stringify(state);
+        const mySeq = ++saveSeq;
+        try {
+          localStorage.setItem(OFFLINE_QUEUE_KEY, snap);
+        } catch (e) {
+          console.warn("Could not write local pending copy", e);
+        }
+        savesInFlight++;
+        lastSaveStartedAt = Date.now();
+        try {
+          await pushStateToServer(snap, mySeq, now);
+        } finally {
+          savesInFlight--;
+        }
+      }
+
+      async function pushStateToServer(snap, mySeq, now) {
+        await waitForQueueIdle(); // never race a background replay of an older copy
+
+        // If offline, the write-ahead copy already holds the data
         if (!navigator.onLine || isOfflineMode) {
-          localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(state));
           syncStatus = "offline";
           showOfflineBanner(true);
           return;
         }
 
-        if (lastKnownSavedAt) {
+        if (lastKnownSavedAt || syncStatus === "conflict") {
           try {
             const { data: current, error } = await sb
               .from("app_state")
@@ -2191,36 +2759,34 @@ ${link("gcash", "phone", "GCash Float")}
                 "Someone else updated the data on another device since this one last loaded.\n\nSaving now may overwrite their changes.\n\nOK = Save anyway\nCancel = Don't save (refresh the page first to get the latest data)",
               );
               if (!proceed) {
-                syncStatus = "conflict";
+                syncStatus = "conflict"; // the pending copy stays on this device
                 return;
               }
             }
           } catch (e) {
-            // Network error during conflict check -> queue it
-            console.warn(
-              "Network error during save check, queueing offline.",
-              e,
-            );
-            localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(state));
+            // Network error during conflict check -> stays pending on this device
+            console.warn("Network error during save check, keeping pending copy.", e);
             syncStatus = "offline";
             showOfflineBanner(true);
             return;
           }
         }
 
-        lastKnownSavedAt = now;
         try {
           const { error } = await sb
             .from("app_state")
-            .update({ data: state })
+            .update({ data: JSON.parse(snap) })
             .eq("id", 1);
           if (error) throw error;
-          syncStatus = "ok";
-          localStorage.removeItem(OFFLINE_QUEUE_KEY); // Clear queue on successful save
-          showOfflineBanner(false);
+          if (!lastKnownSavedAt || now > lastKnownSavedAt) lastKnownSavedAt = now;
+          // Clear the pending copy only when no newer save has started since this one.
+          if (mySeq === saveSeq) {
+            localStorage.removeItem(OFFLINE_QUEUE_KEY);
+            syncStatus = "ok";
+            showOfflineBanner(false);
+          }
         } catch (e) {
-          console.warn("Save failed, queueing offline.", e);
-          localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(state));
+          console.warn("Save failed, kept on this device.", e);
           syncStatus = "offline";
           showOfflineBanner(true);
         }
@@ -2255,6 +2821,51 @@ ${link("gcash", "phone", "GCash Float")}
           content,
         );
         alert("Exported full app state. SHA256: " + hash);
+      }
+
+      function lastBackupText() {
+        try {
+          const t = localStorage.getItem("tindahan-last-backup");
+          if (!t) return "No backup downloaded from this device yet. Download one before every app update.";
+          return "Last backup from this device: " + new Date(t).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+        } catch (e) {
+          return "";
+        }
+      }
+
+      // One-tap backup. Read-only: it never changes the app data. The file has the same shape as
+      // "Export full app state", so "Import state from file" can restore it.
+      async function downloadBackup() {
+        if (!requireOwner()) return;
+        let data = state;
+        let source = "this device's last loaded data";
+        if (hasPendingChanges()) {
+          source = "this device. It has changes that are not synced yet, so back up again after they sync for a full copy";
+        } else if (navigator.onLine) {
+          try {
+            const { data: row, error } = await sb.from("app_state").select("data").eq("id", 1).single();
+            if (!error && row && row.data) {
+              data = row.data;
+              source = "the shared data (what everyone sees)";
+            }
+          } catch (e) {
+            console.warn("Backup: could not reach the server, using this device's copy.", e);
+          }
+        }
+        const d = new Date();
+        const pad = (n) => String(n).padStart(2, "0");
+        const name = `tindahan_backup_${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}_${APP_VERSION}.json`;
+        downloadFile(name, "application/json;charset=utf-8", JSON.stringify(data, null, 2));
+        try {
+          localStorage.setItem("tindahan-last-backup", d.toISOString());
+        } catch (e) {}
+        const n = (k) => (Array.isArray(data[k]) ? data[k].length : 0);
+        notify(
+          `Backup downloaded: ${name}\nFrom ${source}.\nDaily entries: ${n("dailyLogs")} · GCash logs: ${n("gcashLogs")} · Items: ${n("inventory")} · Payables: ${n("payables")} · Suki utang: ${n("receivables")}`,
+          undefined,
+          12000,
+        );
+        render();
       }
 
       async function exportRows(table) {
@@ -2373,6 +2984,7 @@ ${link("gcash", "phone", "GCash Float")}
       function showUndoIndicator() {
         const btn = document.getElementById("undo-btn");
         if (!btn) return;
+        document.body.classList.toggle("has-undo", undoStack.length > 0);
         if (undoStack.length > 0) {
           btn.style.display = "flex";
           btn.title =
@@ -2605,7 +3217,7 @@ ${header("Store Health", "Kalusugan ng Tindahan (Staff view)")}
     <label>Select Month</label>
     <select id="home-month" onchange="changeMonth(this.value)">${monthOptions}</select>
 
-    <div class="split"><div>
+    <div class="split home-split"><div>
     ${todayLogged() ? `<div class="banner" style="margin-top:14px;">Entry logged for today</div>` : `<div class="banner" style="margin-top:14px; background:var(--bad-bg); border-color:var(--bad); color:var(--bad);">Wala pang entry today — <span style="text-decoration:underline;" onclick="go('daily')">log it now</span></div>`}
     ${verdictHtml(sum.net, (sum.salesIn || 0) + (sum.purchOut || 0) + (sum.feeIn || 0) > 0)}
 
@@ -2633,11 +3245,15 @@ ${header("Store Health", "Kalusugan ng Tindahan (Staff view)")}
     <button class="btn" style="width:100%; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="quickRefresh()">Refresh shared data / Kunin ang bagong data</button>
     <div id="last-sync" style="text-align:center; font-size:12px; color:var(--ink-soft); margin-top:8px;">${syncStatus === "ok" ? "Last synced OK " : syncStatus === "offline" ? "Saved locally (Offline) " : syncStatus === "error" ? "Not synced yet " : ""}</div>
 
-    </div><div>
+    </div><div class="home-actions">
     <div class="section-title" style="margin-top:22px;">Quick Actions</div>
 <button class="btn" style="width:100%; background:var(--teal); color:#fff;" onclick="go('daily')">Today's Entry</button>
-<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="go('datatools')">Data Tools</button>
+<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="go('gcash')">GCash Float</button>
+<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="go('household')">Household Budget</button>
+<button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--brass); color:var(--brass);" onclick="go('inventory')">Inventory</button>
 <button class="btn" style="width:100%; margin-top:10px; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="go('insights')">Insights</button>
+<button class="btn" style="width:100%; margin-top:18px; background:transparent; border:1.5px dashed var(--ink-soft); color:var(--ink);" onclick="downloadBackup()">Download backup / I-download ang backup</button>
+<div style="text-align:center; font-size:12px; color:var(--ink-soft); margin-top:8px;">${lastBackupText()}</div>
     </div></div>
   </main>`;
       }
@@ -2653,6 +3269,9 @@ ${header("Store Health", "Kalusugan ng Tindahan (Staff view)")}
           if (p.dark === undefined) p.dark = false;
           if (p.showHints === undefined) p.showHints = false;
           if (p.lockMins === undefined) p.lockMins = 15;
+          if (p.warnDuplicate === undefined) p.warnDuplicate = true;
+          if (p.zeroDetailPopup === undefined) p.zeroDetailPopup = false;
+          if (p.localFirst === undefined) p.localFirst = false;
           return p;
         } catch (e) {
           return {
@@ -2661,6 +3280,9 @@ ${header("Store Health", "Kalusugan ng Tindahan (Staff view)")}
             dark: false,
             showHints: false,
             lockMins: 15,
+            warnDuplicate: true,
+            zeroDetailPopup: false,
+            localFirst: false,
           };
         }
       }
@@ -2922,6 +3544,12 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
 <button class="btn" style="flex:1; background:transparent; border:1.5px solid var(--teal); color:var(--teal);" onclick="exportRowsCsv(document.getElementById('data-table-select').value)">CSV</button>
 </div>
 </div>
+<div class="section-title">Experimental (this device only)</div>
+<div class="card">
+<label style="display:flex; align-items:center; gap:10px;"><input type="checkbox" id="lf-toggle" ${localFirstOn() ? "checked" : ""} onchange="setLocalFirst(this.checked)" style="width:auto;"> Save entries on this device first</label>
+<p class="subtitle" style="margin-top:6px;">Testing. Off by default and only affects this device. New Daily entries get an ID and are stored on this device before they sync. Turn it off any time.</p>
+<button class="btn" style="width:100%; margin-top:8px; background:transparent; border:1.5px solid var(--field-line); color:var(--ink);" onclick="showLocalStatus()">Check on-device storage</button>
+</div>
 <div class="section-title">Danger Zone</div>
 <div class="card">
 <button class="btn" style="width:100%; background:transparent; border:1.5px solid var(--field-line); color:var(--ink);" onclick="importAllDataFromFile()">Import state from file (JSON)</button>
@@ -3059,6 +3687,8 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
     <div class="card">
       <label>Date / Petsa</label>
       <input type="date" id="d-date" value="${todayStr()}">
+      <label style="display:flex; align-items:center; gap:10px;"><input type="checkbox" id="d-closed" onchange="setDailyClosed(this.checked)" style="width:auto;"> Store closed today — Sarado ang tindahan</label>
+      <p class="subtitle hint-opt" style="margin:2px 0 10px;">Ticking this sets every amount to ₱0. You can still edit the amounts if something was sold or bought.</p>
       <label>Ending Cash Counted (₱) — Bilangin ang TODAY's cash lang <span class="info-i" onclick="event.stopPropagation(); showInfo('Count the physical cash of the current day at closing — do NOT subtract expenses on paper. Sales are computed automatically.')">i</span></label>
       <input type="number" id="d-ending" placeholder="0" inputmode="decimal">
       <p class="subtitle hint-opt" style="margin:2px 0 10px;">Count what's physically in today's pile at closing — do NOT subtract expenses on paper anymore. Sales will be calculated automatically — don't type sales directly.</p>
@@ -3093,7 +3723,7 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
                 return `<div class="entry">
           <div>
             <div><b>${r.date}</b>${balanceNote}</div>
-            <div class="meta">Sales ${peso(r.salesIn)} (Ending Cash: ${peso(r.enteredEndingCash)}${r.expFromTodayCash ? ` · from today's cash ${peso(r.expFromTodayCash)}` : ""}) · Bought ${peso(r.purchOut)} · GCash ${peso(r.fee)} · To home ${peso(r.movedDraw)} · by ${escapeHtml(r.loggedBy) || "-"}</div>
+            <div class="meta">Sales ${peso(r.salesIn)} (Ending Cash: ${peso(r.enteredEndingCash)}${r.expFromTodayCash ? ` · from today's cash ${peso(r.expFromTodayCash)}` : ""}) · Bought ${peso(r.purchOut)} · GCash ${peso(r.fee)} · To home ${peso(r.movedDraw)}${r.storeClosed ? " · Store closed" : ""} · by ${escapeHtml(r.loggedBy) || "-"}</div>
           </div>
           <div style="text-align:right;">
             <div class="amt ${net >= 0 ? "pos" : "neg"}">${peso(net)}</div>
@@ -3108,17 +3738,94 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
     </div></div>
   </main>`;
       }
-      function addDaily() {
+      // Small reusable toast (Phase 3 will extend this). Never claims a server result.
+      function notify(text, severity, ms) {
+        let host = document.getElementById("toast-host");
+        if (!host) {
+          host = document.createElement("div");
+          host.id = "toast-host";
+          host.setAttribute("role", "status");
+          host.setAttribute("aria-live", "polite");
+          document.body.appendChild(host);
+        }
+        const t = document.createElement("div");
+        t.className = "toast" + (severity === "error" ? " error" : "");
+        t.textContent = text;
+        t.onclick = () => t.remove();
+        host.appendChild(t);
+        setTimeout(() => t.remove(), ms || (severity === "error" ? 9000 : 6000));
+        return t;
+      }
+
+      let lastDailyCommitAt = 0;
+      function setDailyClosed(on) {
+        if (!on) return;
+        ["d-ending", "d-fromtoday", "d-purch", "d-fee", "d-draw"].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) el.value = "0";
+        });
+      }
+
+      let dailyBusy = false;
+      async function addDaily() {
+        // Guards: right after a save the form is reset, so a second tap would log a blank entry;
+        // and a tap while a save is still being committed must not start a second one.
+        if (dailyBusy || Date.now() - lastDailyCommitAt < 800) return;
+        dailyBusy = true;
+        try {
+          await addDailyInner();
+        } finally {
+          dailyBusy = false;
+        }
+      }
+
+      async function addDailyInner() {
+        if (isReadOnly) {
+          notify("Read-only mode is on. Nothing was saved.", "error");
+          return;
+        }
+        const num = (id) => parseFloat(document.getElementById(id).value) || 0;
         const date = document.getElementById("d-date").value || todayStr();
-        const endingCash =
-          parseFloat(document.getElementById("d-ending").value) || 0;
-        const fromTodayCash =
-          parseFloat(document.getElementById("d-fromtoday").value) || 0;
-        const purchOut =
-          parseFloat(document.getElementById("d-purch").value) || 0;
-        const fee = parseFloat(document.getElementById("d-fee").value) || 0;
-        const movedDraw =
-          parseFloat(document.getElementById("d-draw").value) || 0;
+        const endingCash = num("d-ending");
+        const fromTodayCash = num("d-fromtoday");
+        const purchOut = num("d-purch");
+        const fee = num("d-fee");
+        const movedDraw = num("d-draw");
+        const closedBox = document.getElementById("d-closed");
+        const storeClosed = !!(closedBox && closedBox.checked);
+
+        // Empty fields count as ₱0. Which fields are zero?
+        const money = [
+          ["Ending cash", endingCash],
+          ["Expenses from today's cash", fromTodayCash],
+          ["Stock purchases", purchOut],
+          ["GCash fee", fee],
+          ["Moved to household", movedDraw],
+        ];
+        const zeroNames = money.filter((m) => m[1] === 0).map((m) => m[0]);
+
+        if (
+          zeroNames.length === money.length &&
+          !storeClosed &&
+          !confirm(
+            "All monetary fields are ₱0. Are you sure you want to save this entry?",
+          )
+        ) {
+          notify("Not saved. Your entry is still in the form.");
+          return; // form is kept as typed
+        }
+
+        if (
+          getPrefs().warnDuplicate !== false &&
+          state.dailyLogs.some((l) => l.date === date) &&
+          !confirm(
+            `An entry already exists for ${date}. Proceed anyway? This may create a duplicate. Please review existing entries before continuing.`,
+          )
+        ) {
+          notify("Not saved. Your entry is still in the form.");
+          return; // form is kept as typed
+        }
+
         // v28.4.0 pot-aware reconstruction: today's pile only lost the expenses paid FROM it,
         // so only those get added back. Reserve/GCash-paid expenses never touched the count.
         const salesIn = endingCash + fromTodayCash + movedDraw;
@@ -3133,9 +3840,67 @@ ${header("Data Tools", "Export, Import, at Reset", true)}
           notes: document.getElementById("d-notes").value.trim(),
           loggedBy: currentUser,
         };
+        if (storeClosed) entry.storeClosed = true;
+
+        // Local-first (this device's switch, off by default): the entry and its sync instruction are
+        // committed to IndexedDB together BEFORE anything is claimed. If that fails, nothing is saved
+        // and the form is kept. If on-device storage does not exist at all, fall back to the standard save.
+        let localOp = null;
+        let committedLocally = false;
+        if (localFirstOn()) {
+          entry.id = SyncCore.newId();
+          entry.createdAt = new Date().toISOString();
+          try {
+            localOp = await LocalStore.commitAdd("dailyLogs", entry);
+            committedLocally = true;
+          } catch (e) {
+            if (e && e.unavailable) {
+              if (!window._lfWarned) {
+                window._lfWarned = true;
+                notify("On-device storage is not available in this browser. Using the standard save for now.", "error");
+              }
+            } else {
+              console.warn("On-device commit failed", e);
+              notify("Could not save on this device. Nothing was saved. Your entry is still in the form.", "error");
+              return;
+            }
+          }
+        }
+
         state.dailyLogs.push(entry);
-        saveState();
+        lastDailyCommitAt = Date.now();
+        const syncing = saveState(); // writes the on-device copy synchronously, then syncs in the background
+        if (localOp) {
+          Promise.resolve(syncing)
+            .then(() => markConfirmedOps())
+            .catch(() => {});
+        }
+        const keptOnDevice = committedLocally || hasPendingChanges();
         render();
+
+        const what = storeClosed ? "Store-closed entry saved" : "Entry saved";
+        const zeroLine =
+          zeroNames.length && !storeClosed
+            ? "\n₱0: " + zeroNames.join(", ") + "."
+            : "";
+        if (!keptOnDevice) {
+          notify(
+            "Entry added, but a copy could not be kept on this device. Keep the app open until it syncs.",
+            "error",
+          );
+        } else {
+          const t = notify(what + " on this device. Waiting to sync." + zeroLine);
+          // Only claim "synced" once the server has actually confirmed it.
+          Promise.resolve(syncing)
+            .then(() => {
+              if (t.isConnected && !hasPendingChanges())
+                t.textContent = what + " and synced." + zeroLine;
+            })
+            .catch(() => {});
+        }
+        if (getPrefs().zeroDetailPopup && zeroNames.length && !storeClosed) {
+          alert("These fields were ₱0:\n- " + zeroNames.join("\n- "));
+        }
       }
 
       function renderGcash() {
@@ -6345,7 +7110,11 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
           JSON.stringify(item).slice(0, 120),
           "",
         );
+        const removedRow = state[key][idx];
         state[key].splice(idx, 1);
+        if (key === "dailyLogs" && removedRow && removedRow.id && localFirstOn()) {
+          LocalStore.markDeleted(removedRow.id).catch(() => {}); // a deleted entry is never offered for restore
+        }
         saveState();
         render();
       }
@@ -6419,6 +7188,7 @@ ${errors.length ? `<div class="section-title">Errors (skipped)</div><div class="
           render();
           startAutoRefresh();
           resetInactivityTimer();
+          reconcileLocalStore();
         })();
       }
 
